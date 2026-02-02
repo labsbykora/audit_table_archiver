@@ -138,6 +138,7 @@ checkpoints/
 local_archives/
 .pytest_cache/
 *PLAN*
+*config*.yaml*
 # Docker
 docker-compose.override.yml
 
