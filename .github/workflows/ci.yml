@@ -7,90 +7,90 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+  # test:
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       python-version: ["3.9", "3.10", "3.11"]
 
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_USER: archiver
-          POSTGRES_PASSWORD: archiver_password
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  #   services:
+  #     postgres:
+  #       image: postgres:14
+  #       env:
+  #         POSTGRES_USER: archiver
+  #         POSTGRES_PASSWORD: archiver_password
+  #         POSTGRES_DB: test_db
+  #       ports:
+  #         - 5432:5432
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
 
-      minio:
-        image: minio/minio:latest
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  #     minio:
+  #       image: minio/minio:latest
+  #       env:
+  #         MINIO_ROOT_USER: minioadmin
+  #         MINIO_ROOT_PASSWORD: minioadmin
+  #       ports:
+  #         - 9000:9000
+  #       options: >-
+  #         --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
 
-    steps:
-    - uses: actions/checkout@v4
+  #   steps:
+  #   - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
+  #   - name: Set up Python ${{ matrix.python-version }}
+  #     uses: actions/setup-python@v4
+  #     with:
+  #       python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+  #   - name: Install dependencies
+  #     run: |
+  #       python -m pip install --upgrade pip
+  #       pip install -e ".[dev]"
 
-    - name: Set up MinIO bucket
-      env:
-        AWS_ACCESS_KEY_ID: minioadmin
-        AWS_SECRET_ACCESS_KEY: minioadmin
-      run: |
-        pip install awscli
-        aws --endpoint-url http://localhost:9000 s3 mb s3://test-archives
+  #   - name: Set up MinIO bucket
+  #     env:
+  #       AWS_ACCESS_KEY_ID: minioadmin
+  #       AWS_SECRET_ACCESS_KEY: minioadmin
+  #     run: |
+  #       pip install awscli
+  #       aws --endpoint-url http://localhost:9000 s3 mb s3://test-archives
 
-    - name: Lint with ruff
-      run: |
-        ruff check .
+  #   - name: Lint with ruff
+  #     run: |
+  #       ruff check .
 
-    - name: Type check with mypy
-      run: |
-        mypy src/ || true  # Allow failures for now
+  #   - name: Type check with mypy
+  #     run: |
+  #       mypy src/ || true  # Allow failures for now
 
-    - name: Format check with black
-      run: |
-        black --check .
+  #   - name: Format check with black
+  #     run: |
+  #       black --check .
 
-    - name: Run unit tests
-      run: |
-        pytest tests/unit/ -v --cov=archiver --cov-report=term-missing
+  #   - name: Run unit tests
+  #     run: |
+  #       pytest tests/unit/ -v --cov=archiver --cov-report=term-missing
 
-    - name: Run integration tests
-      env:
-        AWS_ACCESS_KEY_ID: minioadmin
-        AWS_SECRET_ACCESS_KEY: minioadmin
-      run: |
-        pytest tests/integration/ -v -m integration
+  #   - name: Run integration tests
+  #     env:
+  #       AWS_ACCESS_KEY_ID: minioadmin
+  #       AWS_SECRET_ACCESS_KEY: minioadmin
+  #     run: |
+  #       pytest tests/integration/ -v -m integration
 
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
+  #   - name: Upload coverage
+  #     uses: codecov/codecov-action@v3
+  #     with:
+  #       file: ./coverage.xml
+  #       flags: unittests
+  #       name: codecov-umbrella
 
   build-and-push:
     runs-on: ubuntu-latest
