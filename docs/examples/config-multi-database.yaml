@@ -1,0 +1,87 @@
+# Multi-Database Configuration Example
+# This example shows how to configure the archiver for multiple databases
+
+version: "2.0"
+
+# Global defaults apply to all databases/tables unless overridden
+defaults:
+  retention_days: 90
+  batch_size: 10000
+  sleep_between_batches: 2
+  vacuum_after: true
+  vacuum_strategy: "standard"
+  
+  # Multi-database processing options
+  parallel_databases: false  # Set to true to enable parallel processing
+  max_parallel_databases: 3   # Max databases to process in parallel (if parallel_databases=true)
+  connection_pool_size: 5     # Default connection pool size per database
+
+# S3 configuration (shared across all databases)
+s3:
+  endpoint: "${S3_ENDPOINT:-}"  # Leave empty for AWS S3, set for MinIO/S3-compatible
+  bucket: "${S3_BUCKET:-archives}"
+  prefix: "audit/"
+  region: "${AWS_REGION:-us-east-1}"
+  storage_class: "STANDARD_IA"
+  encryption: "SSE-S3"  # or "SSE-KMS", "none" for MinIO
+  multipart_threshold_mb: 100
+
+# Database configurations
+databases:
+  # Database 1: Production audit logs
+  - name: "prod_audit_db"
+    host: "prod-db.example.com"
+    port: 5432
+    user: "archiver"
+    password_env: "PROD_DB_PASSWORD"  # Use environment variable (recommended)
+    connection_pool_size: 10  # Override global default for this database
+    tables:
+      - name: "user_audit_logs"
+        schema: "public"
+        timestamp_column: "created_at"
+        primary_key: "id"
+        retention_days: 90
+        batch_size: 10000
+        critical: true  # Enable additional safety checks
+        
+      - name: "system_audit_logs"
+        schema: "public"
+        timestamp_column: "event_timestamp"
+        primary_key: "event_id"
+        retention_days: 180  # Longer retention for system events
+        batch_size: 5000
+
+  # Database 2: Staging audit logs
+  - name: "staging_audit_db"
+    host: "staging-db.example.com"
+    port: 5432
+    user: "archiver"
+    password_env: "STAGING_DB_PASSWORD"
+    # Uses default connection_pool_size: 5
+    tables:
+      - name: "audit_logs"
+        schema: "public"
+        timestamp_column: "created_at"
+        primary_key: "id"
+        retention_days: 30  # Shorter retention for staging
+
+  # Database 3: Development audit logs
+  - name: "dev_audit_db"
+    host: "dev-db.example.com"
+    port: 5432
+    user: "archiver"
+    password_env: "DEV_DB_PASSWORD"
+    connection_pool_size: 3  # Smaller pool for dev
+    tables:
+      - name: "audit_logs"
+        schema: "public"
+        timestamp_column: "created_at"
+        primary_key: "id"
+        retention_days: 7  # Very short retention for dev
+
+# Example with parallel processing enabled:
+# defaults:
+#   parallel_databases: true
+#   max_parallel_databases: 2  # Process 2 databases at a time
+#   connection_pool_size: 5
+

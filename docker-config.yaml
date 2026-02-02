@@ -1,0 +1,29 @@
+version: "2.0"
+
+s3:
+  endpoint: http://minio:9000  # MinIO endpoint
+  bucket: test-archives
+  prefix: archives/
+  region: us-east-1
+  storage_class: STANDARD
+  encryption: none  # MinIO doesn't support SSE-S3, use 'none' for S3-compatible storage
+  access_key_id: minioadmin
+  secret_access_key: minioadmin
+
+defaults:
+  retention_days: 90
+  batch_size: 100
+
+databases:
+  - name: test_db
+    host: postgres
+    port: 5432
+    user: archiver
+    password_env: DB_PASSWORD
+    tables:
+      - name: sample_records
+        schema: public
+        timestamp_column: created_at
+        primary_key: id
+        retention_days: 150
+        batch_size: 10000

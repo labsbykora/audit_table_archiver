@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: archiver-postgres
+    environment:
+      POSTGRES_USER: archiver
+      POSTGRES_PASSWORD: archiver_password
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U archiver -d test_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: archiver-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  archiver:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: archiver-service
+    environment:
+      # Database connection (using service name)
+      DB_PASSWORD: archiver_password
+      # S3/MinIO credentials
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ENDPOINT_URL: http://minio:9000
+    volumes:
+      # Mount Docker-specific config file (uses service names for networking)
+      - ../docker-config.yaml:/app/config.yaml:ro
+      # Optional: mount logs directory if you want persistent logs
+      # - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    # For development: run manually when needed
+    # For production: use command to run archival or make it a scheduled job
+    # command: ["python", "-m", "archiver.main", "--config", "/app/config.yaml"]
+    # Run as one-shot (exits after archival completes)
+    restart: "no"
+    # Optional: expose health check port if health server is enabled
+    # ports:
+    #   - "8080:8080"
+    networks:
+      - default
+    # Override config to use service names for database
+    # Note: config.yaml should reference 'postgres' as host for docker-compose networking
+
+volumes:
+  postgres_data:
+  minio_data:
+

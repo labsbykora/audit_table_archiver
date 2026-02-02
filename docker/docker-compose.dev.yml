@@ -1,0 +1,40 @@
+# Development docker-compose with archiver service
+# This extends the base docker-compose.yml for local development
+
+version: '3.8'
+
+services:
+  archiver:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: archiver-service
+    environment:
+      # Database connection (using service name)
+      DB_PASSWORD: archiver_password
+      # S3/MinIO credentials
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ENDPOINT_URL: http://minio:9000
+      # Development settings
+      PYTHONUNBUFFERED: 1
+    volumes:
+      # Mount config file
+      - ../config.yaml:/app/config.yaml:ro
+      # Mount source code for development (allows live code changes)
+      - ../src:/app/src:ro
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    # Development: run interactively
+    stdin_open: true
+    tty: true
+    # Override default command to keep container running for interactive use
+    command: ["tail", "-f", "/dev/null"]
+    networks:
+      - default
+
