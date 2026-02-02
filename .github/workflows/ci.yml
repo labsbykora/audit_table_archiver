@@ -41,8 +41,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          --entrypoint sh -c "minio server /data --console-address ':9001'"
-        # 'cmd' is NOT a valid property for GitHub Actions service containers!
+          server /data --console-address ":9001"
         # To override the default command, use --entrypoint in 'options', as above.
 
     steps:
