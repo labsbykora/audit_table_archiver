@@ -41,6 +41,25 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e ".[dev]"
 
+    # --- Lint & format (fail fast, before starting services) ---
+    - name: Auto-fix with ruff
+      run: |
+        ruff check --fix .
+
+    - name: Verify linting
+      run: |
+        ruff check .
+
+    - name: Format check with black
+      run: |
+        black --version
+        black --check .
+
+    - name: Type check with mypy
+      run: |
+        mypy src/ || true  # Allow failures for now
+
+    # --- Start services for tests ---
     - name: Start MinIO service
       run: |
         docker run -d --name minio \
@@ -67,19 +86,7 @@ jobs:
         pip install awscli
         aws --endpoint-url http://localhost:9000 s3 mb s3://test-archives
 
-    - name: Lint with ruff
-      run: |
-        ruff check .
-
-    - name: Type check with mypy
-      run: |
-        mypy src/ || true  # Allow failures for now
-
-    - name: Format check with black
-      run: |
-        black --version
-        black --check .
-
+    # --- Tests ---
     - name: Run unit tests
       run: |
         pytest tests/unit/ -v --cov-report=term-missing
