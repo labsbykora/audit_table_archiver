@@ -22,8 +22,30 @@ def docker_compose_file() -> Path:
 
 @pytest.fixture(scope="session")
 def postgres_ready(docker_compose_file: Path) -> Generator[None, None, None]:
-    """Wait for PostgreSQL to be ready."""
-    # Check if services are running
+    """Wait for PostgreSQL to be ready (works with docker-compose or CI services)."""
+
+    async def check_connection() -> None:
+        conn = await asyncpg.connect(
+            host="localhost",
+            port=5432,
+            user="archiver",
+            password="archiver_password",
+            database="test_db",
+        )
+        await conn.close()
+
+    # Try direct connection first (works in CI where Postgres is a service)
+    max_attempts = 30
+    for attempt in range(max_attempts):
+        try:
+            asyncio.run(check_connection())
+            yield
+            return
+        except Exception:
+            if attempt < max_attempts - 1:
+                time.sleep(1)
+
+    # If direct connection failed, check docker-compose
     try:
         result = subprocess.run(
             ["docker-compose", "-f", str(docker_compose_file), "ps", "-q", "postgres"],
@@ -32,39 +54,30 @@ def postgres_ready(docker_compose_file: Path) -> Generator[None, None, None]:
             check=False,
         )
         if not result.stdout.strip():
-            pytest.skip("PostgreSQL container not running. Start with: docker-compose up -d")
-
-        # Wait for PostgreSQL to be ready
-        max_attempts = 30
-        for attempt in range(max_attempts):
-            try:
-
-                async def check_connection():
-                    conn = await asyncpg.connect(
-                        host="localhost",
-                        port=5432,
-                        user="archiver",
-                        password="archiver_password",
-                        database="test_db",
-                    )
-                    await conn.close()
-
-                asyncio.run(check_connection())
-                break
-            except Exception:
-                if attempt < max_attempts - 1:
-                    time.sleep(1)
-                else:
-                    pytest.skip("PostgreSQL not ready after 30 seconds")
-
-        yield
+            pytest.skip("PostgreSQL not reachable. Start with: docker-compose up -d")
     except FileNotFoundError:
-        pytest.skip("docker-compose not found. Install Docker Compose to run integration tests.")
+        pass
+
+    pytest.skip("PostgreSQL not ready after 30 seconds")
 
 
 @pytest.fixture(scope="session")
 def minio_ready(docker_compose_file: Path) -> Generator[None, None, None]:
-    """Wait for MinIO to be ready."""
+    """Wait for MinIO to be ready (works with docker-compose or CI docker run)."""
+    import urllib.request
+
+    # Try direct health check first (works in CI)
+    max_attempts = 15
+    for attempt in range(max_attempts):
+        try:
+            urllib.request.urlopen("http://localhost:9000/minio/health/live", timeout=2)
+            yield
+            return
+        except Exception:
+            if attempt < max_attempts - 1:
+                time.sleep(2)
+
+    # If health check failed, check docker-compose
     try:
         result = subprocess.run(
             ["docker-compose", "-f", str(docker_compose_file), "ps", "-q", "minio"],
@@ -73,12 +86,11 @@ def minio_ready(docker_compose_file: Path) -> Generator[None, None, None]:
             check=False,
         )
         if not result.stdout.strip():
-            pytest.skip("MinIO container not running. Start with: docker-compose up -d")
-
-        # MinIO should be ready if container is running
-        yield
+            pytest.skip("MinIO not reachable. Start with: docker-compose up -d")
     except FileNotFoundError:
-        pytest.skip("docker-compose not found")
+        pass
+
+    pytest.skip("MinIO not ready after 30 seconds")
 
 
 @pytest.fixture

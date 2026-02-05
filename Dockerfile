@@ -37,8 +37,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY src/ ./src/
 COPY pyproject.toml ./
 
-# Install application in editable mode (or non-editable for production)
-RUN pip install --no-cache-dir -e .
+# Install application (non-editable for production)
+RUN pip install --no-cache-dir .
 
 # Create non-root user for security
 RUN useradd -m -u 1000 archiver && \

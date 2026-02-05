@@ -9,6 +9,7 @@ import structlog
 from archiver.config import DatabaseConfig, TableConfig
 from archiver.database import DatabaseManager
 from archiver.exceptions import DatabaseError
+from utils import safe_identifier
 from utils.logging import get_logger
 
 
@@ -115,9 +116,9 @@ class BatchProcessor:
             Number of eligible records
         """
         cutoff = await self.calculate_cutoff_date_for_query()
-        schema = self.table_config.schema_name
-        table = self.table_config.name
-        timestamp_col = self.table_config.timestamp_column
+        schema = safe_identifier(self.table_config.schema_name)
+        table = safe_identifier(self.table_config.name)
+        timestamp_col = safe_identifier(self.table_config.timestamp_column)
 
         query = f"""
             SELECT COUNT(*)
@@ -157,10 +158,10 @@ class BatchProcessor:
         Raises:
             DatabaseError: If selection fails
         """
-        schema = self.table_config.schema_name
-        table = self.table_config.name
-        timestamp_col = self.table_config.timestamp_column
-        primary_key = self.table_config.primary_key
+        schema = safe_identifier(self.table_config.schema_name)
+        table = safe_identifier(self.table_config.name)
+        timestamp_col = safe_identifier(self.table_config.timestamp_column)
+        primary_key = safe_identifier(self.table_config.primary_key)
         cutoff = await self.calculate_cutoff_date_for_query()
 
         # Build query with cursor-based pagination

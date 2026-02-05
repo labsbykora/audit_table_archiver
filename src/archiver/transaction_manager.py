@@ -49,6 +49,7 @@ class TransactionManager:
         """
         self._transaction_start = datetime.now()
         self._savepoint_count = 0
+        monitor_task: Optional[asyncio.Task[None]] = None
 
         try:
             async with self.connection.transaction():
@@ -58,7 +59,7 @@ class TransactionManager:
                 )
 
                 # Monitor transaction age
-                asyncio.create_task(self._monitor_transaction())
+                monitor_task = asyncio.create_task(self._monitor_transaction())
 
                 self.logger.debug(
                     "Transaction started",
@@ -87,6 +88,12 @@ class TransactionManager:
         finally:
             self._transaction_start = None
             self._savepoint_count = 0
+            if monitor_task and not monitor_task.done():
+                monitor_task.cancel()
+                try:
+                    await monitor_task
+                except asyncio.CancelledError:
+                    pass
 
     @asynccontextmanager
     async def savepoint(self, name: Optional[str] = None) -> AsyncGenerator[None, None]:

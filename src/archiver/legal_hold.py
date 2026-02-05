@@ -7,6 +7,7 @@ import structlog
 
 from archiver.database import DatabaseManager
 from archiver.exceptions import DatabaseError
+from utils import safe_identifier
 from utils.logging import get_logger
 
 
@@ -189,7 +190,7 @@ class LegalHoldChecker:
                 expiration_date,
                 requestor,
                 where_clause
-            FROM {hold_schema}.{hold_table}
+            FROM {safe_identifier(hold_schema)}.{safe_identifier(hold_table)}
             WHERE table_name = $1
               AND schema_name = $2
               AND start_date <= NOW()

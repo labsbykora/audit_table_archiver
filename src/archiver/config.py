@@ -434,6 +434,37 @@ class DefaultsConfig(BaseModel):
         gt=0,
         le=50,
     )
+    compression_level: int = Field(
+        default=6,
+        description="Gzip compression level (1=fastest, 9=best compression)",
+        ge=1,
+        le=9,
+    )
+    fail_on_schema_drift: bool = Field(
+        default=False,
+        description="Fail archival if schema drift is detected between batches",
+    )
+    lock_type: str = Field(
+        default="postgresql",
+        description="Distributed lock type (postgresql, redis, file)",
+    )
+    watermark_storage_type: str = Field(
+        default="s3",
+        description="Storage backend for watermarks (s3, database, both)",
+    )
+    checkpoint_storage_type: str = Field(
+        default="s3",
+        description="Storage backend for checkpoints (s3, local)",
+    )
+    checkpoint_interval: int = Field(
+        default=10,
+        description="Save checkpoint every N batches",
+        ge=1,
+    )
+    audit_trail_storage_type: str = Field(
+        default="s3",
+        description="Storage backend for audit trail (s3, database)",
+    )
 
 
 class LegalHoldConfig(BaseModel):

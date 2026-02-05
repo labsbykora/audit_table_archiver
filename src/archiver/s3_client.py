@@ -606,10 +606,14 @@ class S3Client:
 
             objects = []
             paginator = self.client.get_paginator("list_objects_v2")
+            pagination_config = {}
+            if max_keys:
+                pagination_config["PageSize"] = max_keys
+                pagination_config["MaxItems"] = max_keys
             page_iterator = paginator.paginate(
                 Bucket=self.config.bucket,
                 Prefix=full_prefix,
-                MaxKeys=max_keys,
+                PaginationConfig=pagination_config,
             )
 
             for page in page_iterator:
@@ -622,10 +626,6 @@ class S3Client:
                                 "size": obj.get("Size", 0),
                             }
                         )
-
-                # Stop if we've reached max_keys
-                if max_keys and len(objects) >= max_keys:
-                    break
 
             self.logger.debug(
                 "S3 objects listed",

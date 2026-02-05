@@ -182,7 +182,7 @@ class TestS3ArchiveReader:
 
     @pytest.mark.asyncio
     async def test_read_archive_metadata_not_found(self, s3_config: S3Config) -> None:
-        """Test archive read when metadata file is missing."""
+        """Test archive read when both metadata and data files are missing."""
         with patch("restore.s3_reader.S3Client") as mock_s3_client_class:
             mock_s3_client = MagicMock()
             mock_s3_client.get_object_bytes = MagicMock(side_effect=Exception("Not found"))
@@ -190,7 +190,7 @@ class TestS3ArchiveReader:
 
             reader = S3ArchiveReader(s3_config)
             reader.s3_client = mock_s3_client
-            with pytest.raises(S3Error, match="Failed to read metadata"):
+            with pytest.raises(S3Error, match="Failed to read data file from S3"):
                 await reader.read_archive("test.jsonl.gz")
 
     @pytest.mark.asyncio

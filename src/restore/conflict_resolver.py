@@ -5,6 +5,7 @@ from typing import Any, Optional
 import structlog
 
 from archiver.exceptions import ArchiverError
+from utils import safe_identifier
 from utils.logging import get_logger
 
 
@@ -113,10 +114,12 @@ class ConflictDetector:
             return ConflictReport(conflicts=[], total_conflicts=0, conflict_types={})
 
         # Query database for existing records with these primary keys
+        pk_safe = safe_identifier(primary_key)
+        schema_table = f"{safe_identifier(schema)}.{safe_identifier(table)}"
         query = f"""
-            SELECT {primary_key}
-            FROM {schema}.{table}
-            WHERE {primary_key} = ANY($1)
+            SELECT {pk_safe}
+            FROM {schema_table}
+            WHERE {pk_safe} = ANY($1)
         """
 
         try:

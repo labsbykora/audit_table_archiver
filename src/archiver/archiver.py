@@ -35,6 +35,7 @@ from archiver.schema_drift import SchemaDriftDetector
 from archiver.serializer import PostgreSQLSerializer
 from archiver.verifier import Verifier
 from archiver.watermark_manager import WatermarkManager
+from utils import safe_identifier
 from utils.checksum import ChecksumCalculator
 from utils.logging import get_logger
 
@@ -58,10 +59,11 @@ class Archiver:
         self.config = config
         self.dry_run = dry_run
         self.logger = logger or get_logger("archiver")
+        defaults = config.defaults
         self.serializer = PostgreSQLSerializer(logger=self.logger)
         self.compressor = Compressor(
-            compression_level=6, logger=self.logger
-        )  # TODO: Make configurable
+            compression_level=defaults.compression_level, logger=self.logger
+        )
         self.verifier = Verifier(logger=self.logger)
         self.checksum_calculator = ChecksumCalculator(logger=self.logger)
         self.metadata_generator = MetadataGenerator(logger=self.logger)
@@ -69,20 +71,20 @@ class Archiver:
         self.sample_verifier = SampleVerifier(logger=self.logger)
         self.schema_detector = SchemaDetector(logger=self.logger)
         self.schema_drift_detector = SchemaDriftDetector(
-            fail_on_drift=False,  # TODO: Make configurable
+            fail_on_drift=defaults.fail_on_schema_drift,
             logger=self.logger,
         )
         self.watermark_manager = WatermarkManager(
-            storage_type="s3",  # TODO: Make configurable
+            storage_type=defaults.watermark_storage_type,
             logger=self.logger,
         )
         self.lock_manager = LockManager(
-            lock_type="postgresql",  # TODO: Make configurable
+            lock_type=defaults.lock_type,
             logger=self.logger,
         )
         self.checkpoint_manager = CheckpointManager(
-            storage_type="s3",  # TODO: Make configurable
-            checkpoint_interval=10,  # TODO: Make configurable
+            storage_type=defaults.checkpoint_storage_type,
+            checkpoint_interval=defaults.checkpoint_interval,
             logger=self.logger,
         )
 
@@ -110,7 +112,7 @@ class Archiver:
 
         # Initialize audit trail
         self.audit_trail = AuditTrail(
-            storage_type="s3",  # TODO: Make configurable
+            storage_type=defaults.audit_trail_storage_type,
             logger=self.logger,
         )
 
@@ -897,7 +899,7 @@ class Archiver:
                     break
 
                 # Process batch
-                await self._process_batch(
+                s3_key = await self._process_batch(
                     db_manager,
                     s3_client,
                     batch_processor,
@@ -1078,9 +1080,9 @@ class Archiver:
 
         # Count records in database that match this batch's primary keys
         # This is the actual count we're about to delete
-        pk_col = table_config.primary_key
-        schema = table_config.schema_name
-        table = table_config.name
+        pk_col = safe_identifier(table_config.primary_key)
+        schema = safe_identifier(table_config.schema_name)
+        table = safe_identifier(table_config.name)
 
         # Count records with these primary keys (for verification)
         count_query = f"""
@@ -1285,9 +1287,9 @@ class Archiver:
                 self.metrics.start_phase_timer("delete")
             async with db_manager.transaction() as conn:
                 # Delete records
-                pk_col = table_config.primary_key
-                schema = table_config.schema_name
-                table = table_config.name
+                pk_col = safe_identifier(table_config.primary_key)
+                schema = safe_identifier(table_config.schema_name)
+                table = safe_identifier(table_config.name)
 
                 # Build delete query - handle different PK types
                 # For MVP, assume integer types. In Phase 2, detect type dynamically

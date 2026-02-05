@@ -13,6 +13,7 @@ from archiver.schema_detector import SchemaDetector
 from restore.conflict_resolver import ConflictDetector, ConflictResolver
 from restore.s3_reader import ArchiveFile
 from restore.schema_migrator import SchemaMigrator
+from utils import safe_identifier
 from utils.logging import get_logger
 
 
@@ -463,7 +464,9 @@ class RestoreEngine:
         dropped = []
         for idx in indexes:
             try:
-                await conn.execute(f"DROP INDEX IF EXISTS {schema}.{idx['indexname']}")
+                await conn.execute(
+                    f"DROP INDEX IF EXISTS {safe_identifier(schema)}.{safe_identifier(idx['indexname'])}"
+                )
                 dropped.append({"name": idx["indexname"], "def": idx["indexdef"]})
                 self.logger.debug(
                     "Dropped index", schema=schema, table=table, index=idx["indexname"]
@@ -523,9 +526,12 @@ class RestoreEngine:
             Number of records restored
         """
         # Build INSERT query with ON CONFLICT DO NOTHING
+        safe_schema = safe_identifier(schema)
+        safe_table = safe_identifier(table)
+        safe_cols = [safe_identifier(c) for c in columns]
         placeholders = ", ".join([f"${i+1}" for i in range(len(columns))])
         insert_query = f"""
-            INSERT INTO {schema}.{table} ({', '.join(columns)})
+            INSERT INTO {safe_schema}.{safe_table} ({', '.join(safe_cols)})
             VALUES ({placeholders})
             ON CONFLICT DO NOTHING
         """
@@ -587,17 +593,60 @@ class RestoreEngine:
             column_types: Column type mapping
             batch_size: Batch size for inserts
             commit_frequency: Commit every N batches
+            current_schema: Current database schema (for primary key extraction)
 
         Returns:
             Number of records restored (inserted + updated)
         """
+        # Extract primary key from schema
+        primary_key = None
+        if current_schema and current_schema.get("primary_key"):
+            pk_cols = current_schema["primary_key"].get("columns", [])
+            if pk_cols:
+                primary_key = pk_cols[0]
+
+        # If no primary key in schema, try to detect from table
+        if not primary_key:
+            try:
+                pk_query = """
+                    SELECT a.attname
+                    FROM pg_index i
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                    WHERE i.indrelid = $1::regclass
+                      AND i.indisprimary
+                    LIMIT 1
+                """
+                pk_result = await conn.fetchval(pk_query, f"{schema}.{table}")
+                if pk_result:
+                    primary_key = pk_result
+            except Exception as e:
+                self.logger.warning(
+                    "Could not detect primary key, ON CONFLICT may fail",
+                    schema=schema,
+                    table=table,
+                    error=str(e),
+                )
+
+        if not primary_key:
+            raise DatabaseError(
+                f"Cannot use 'overwrite' or 'upsert' strategy: no primary key found for {schema}.{table}. "
+                "Use 'skip' or 'fail' strategy instead, or ensure the table has a primary key.",
+                context={"schema": schema, "table": table},
+            )
+
         # Build UPDATE clause for ON CONFLICT
-        update_clause = ", ".join([f"{col} = EXCLUDED.{col}" for col in columns])
+        safe_schema = safe_identifier(schema)
+        safe_table = safe_identifier(table)
+        safe_cols = [safe_identifier(c) for c in columns]
+        safe_pk = safe_identifier(primary_key)
+        update_clause = ", ".join(
+            [f"{safe_identifier(col)} = EXCLUDED.{safe_identifier(col)}" for col in columns]
+        )
         placeholders = ", ".join([f"${i+1}" for i in range(len(columns))])
         insert_query = f"""
-            INSERT INTO {schema}.{table} ({', '.join(columns)})
+            INSERT INTO {safe_schema}.{safe_table} ({', '.join(safe_cols)})
             VALUES ({placeholders})
-            ON CONFLICT DO UPDATE SET {update_clause}
+            ON CONFLICT ({safe_pk}) DO UPDATE SET {update_clause}
         """
 
         restored_count = 0
@@ -653,9 +702,12 @@ class RestoreEngine:
         Raises:
             DatabaseError: If conflict detected
         """
+        safe_schema = safe_identifier(schema)
+        safe_table = safe_identifier(table)
+        safe_cols = [safe_identifier(c) for c in columns]
         placeholders = ", ".join([f"${i+1}" for i in range(len(columns))])
         insert_query = f"""
-            INSERT INTO {schema}.{table} ({', '.join(columns)})
+            INSERT INTO {safe_schema}.{safe_table} ({', '.join(safe_cols)})
             VALUES ({placeholders})
         """
 

@@ -9,6 +9,7 @@ import structlog
 from archiver.compressor import Compressor
 from archiver.exceptions import VerificationError
 from archiver.serializer import PostgreSQLSerializer
+from utils import safe_identifier
 from utils.logging import get_logger
 
 
@@ -178,10 +179,12 @@ class SampleVerifier:
             return
 
         # Query database for sample primary keys
+        pk_col = safe_identifier(primary_key_column)
+        schema_table = f"{safe_identifier(table_schema)}.{safe_identifier(table_name)}"
         query = f"""
-            SELECT {primary_key_column}
-            FROM {table_schema}.{table_name}
-            WHERE {primary_key_column} = ANY($1)
+            SELECT {pk_col}
+            FROM {schema_table}
+            WHERE {pk_col} = ANY($1)
         """
 
         try:

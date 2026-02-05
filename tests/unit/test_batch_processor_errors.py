@@ -103,9 +103,9 @@ async def test_select_batch_with_watermark(batch_processor: BatchProcessor) -> N
     )
 
     assert result is not None
-    # Verify watermark was used in query
+    # Verify watermark was used in query (identifiers are now quoted)
     fetch_calls = [str(call) for call in batch_processor.db_manager.fetch.call_args_list]
-    assert any("created_at >" in str(call) or "id >" in str(call) for call in fetch_calls)
+    assert any('"created_at" >' in str(call) or '"id" >' in str(call) for call in fetch_calls)
 
 
 @pytest.mark.asyncio

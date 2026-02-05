@@ -75,13 +75,19 @@ jobs:
       run: |
         mypy src/ || true  # Allow failures for now
 
+    - name: Normalize line endings
+      run: |
+        # Ensure all Python files have LF endings (handles any CRLF in repo)
+        git config core.autocrlf input
+        find . -name '*.py' -exec sed -i 's/\r$//' {} +
+
     - name: Format check with black
       run: |
         black --check .
 
     - name: Run unit tests
       run: |
-        pytest tests/unit/ -v --cov=archiver --cov-report=term-missing
+        pytest tests/unit/ -v --cov-report=term-missing
 
     - name: Run integration tests
       env:

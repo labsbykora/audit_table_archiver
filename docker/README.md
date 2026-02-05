@@ -71,7 +71,64 @@ python -m archiver.main --config /app/config.yaml
 docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml run --rm archiver bash
 ```
 
-### 5. View Logs
+### 5. Restore Archived Data
+
+**List available archives:**
+
+```bash
+# From project root
+docker-compose -f docker/docker-compose.yml run --rm archiver \
+  python -m restore.main --config /app/config.yaml \
+    --database test_db --table sample_records
+```
+
+**Restore a specific archive file:**
+
+```bash
+# From project root
+docker-compose -f docker/docker-compose.yml run --rm archiver \
+  python -m restore.main --config /app/config.yaml \
+    --s3-key "archives/test_db/public/sample_records/year=2026/month=01/day=04/batch_001.jsonl.gz" \
+    --conflict-strategy skip
+```
+
+**Restore all archives for a table:**
+
+```bash
+# From project root
+docker-compose -f docker/docker-compose.yml run --rm archiver \
+  python -m restore.main --config /app/config.yaml \
+    --database test_db --table sample_records \
+    --restore-all \
+    --conflict-strategy overwrite
+```
+
+**Restore with date filtering:**
+
+```bash
+# Restore archives from a date range
+docker-compose -f docker/docker-compose.yml run --rm archiver \
+  python -m restore.main --config /app/config.yaml \
+    --database test_db --table sample_records \
+    --restore-all \
+    --start-date 2026-01-01 \
+    --end-date 2026-01-31 \
+    --conflict-strategy upsert
+```
+
+**Restore conflict strategies:**
+- `skip`: Skip records that already exist (default)
+- `overwrite`: Replace existing records with archived data
+- `upsert`: Update existing records, insert new ones
+- `fail`: Fail if any conflicts are detected
+
+**Additional restore options:**
+- `--drop-indexes`: Temporarily drop indexes during restore (faster for large restores)
+- `--batch-size`: Number of records per batch (default: 1000)
+- `--commit-frequency`: Commit every N batches (default: 1)
+- `--dry-run`: Preview restore without making changes
+
+### 6. View Logs
 
 ```bash
 # View all services

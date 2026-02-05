@@ -88,13 +88,17 @@ async def test_calculate_cutoff_date_with_buffer(batch_processor: BatchProcessor
 async def test_count_eligible_records(batch_processor: BatchProcessor) -> None:
     """Test counting eligible records."""
     mock_db_manager = MagicMock()
-    mock_db_manager.fetchval = AsyncMock(return_value=100)
+    # First call: _is_timestamp_column_timezone_aware (data_type lookup)
+    # Second call: actual COUNT(*) query
+    mock_db_manager.fetchval = AsyncMock(
+        side_effect=["timestamp with time zone", 100]
+    )
     batch_processor.db_manager = mock_db_manager
 
     count = await batch_processor.count_eligible_records()
 
     assert count == 100
-    mock_db_manager.fetchval.assert_called_once()
+    assert mock_db_manager.fetchval.call_count == 2
 
 
 @pytest.mark.asyncio
