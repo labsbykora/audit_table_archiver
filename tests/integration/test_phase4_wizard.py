@@ -12,6 +12,7 @@ from wizard.config_wizard import ConfigWizard
 @pytest.mark.asyncio
 async def test_wizard_detect_tables_integration(
     db_connection,
+    test_table: str,
 ):
     """Test wizard table detection with real database."""
     os.environ["TEST_DB_PASSWORD"] = "archiver_password"

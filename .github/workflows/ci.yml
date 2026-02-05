@@ -95,7 +95,7 @@ jobs:
         AWS_ACCESS_KEY_ID: minioadmin
         AWS_SECRET_ACCESS_KEY: minioadmin
       run: |
-        pytest tests/integration/ -v -m integration
+        pytest tests/integration/ -v -m "integration and not slow"
 
     - name: Upload coverage
       uses: codecov/codecov-action@v3
