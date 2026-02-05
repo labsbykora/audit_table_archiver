@@ -1,7 +1,7 @@
 """S3 storage cost estimation."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Optional
 
 import structlog
@@ -9,7 +9,7 @@ import structlog
 from utils.logging import get_logger
 
 
-class StorageClass(str, Enum):
+class StorageClass(StrEnum):
     """S3 storage class options."""
 
     STANDARD = "STANDARD"
