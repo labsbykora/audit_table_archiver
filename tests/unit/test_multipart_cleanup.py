@@ -1,6 +1,6 @@
 """Unit tests for multipart cleanup module."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,11 +17,11 @@ def mock_s3_client() -> MagicMock:
     s3_config = MagicMock()
     s3_config.bucket = "test-bucket"
     s3_config.prefix = "archives/"
-    
+
     s3_client = MagicMock()
     s3_client.config = s3_config
     s3_client.client = client
-    
+
     return s3_client
 
 
@@ -37,10 +37,10 @@ async def test_list_orphaned_uploads_success(cleanup: MultipartCleanup, mock_s3_
     # Create mock paginator
     mock_paginator = MagicMock()
     mock_page_iterator = MagicMock()
-    
+
     stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
     fresh_time = datetime.now(timezone.utc) - timedelta(hours=1)
-    
+
     mock_page_iterator.paginate.return_value = [
         {
             "Uploads": [
@@ -59,12 +59,12 @@ async def test_list_orphaned_uploads_success(cleanup: MultipartCleanup, mock_s3_
             ]
         }
     ]
-    
+
     mock_s3_client.client.get_paginator.return_value = mock_paginator
     mock_paginator.paginate.return_value = mock_page_iterator.paginate.return_value
-    
+
     result = await cleanup.list_orphaned_uploads()
-    
+
     assert len(result) == 1
     assert result[0]["key"] == "archives/db1/table1/file1.jsonl.gz"
     assert result[0]["upload_id"] == "upload-1"
@@ -75,7 +75,7 @@ async def test_list_orphaned_uploads_with_prefix(cleanup: MultipartCleanup, mock
     """Test listing with prefix filter."""
     mock_paginator = MagicMock()
     stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
-    
+
     mock_page_iterator = MagicMock()
     mock_page_iterator.paginate.return_value = [
         {
@@ -95,12 +95,12 @@ async def test_list_orphaned_uploads_with_prefix(cleanup: MultipartCleanup, mock
             ]
         }
     ]
-    
+
     mock_s3_client.client.get_paginator.return_value = mock_paginator
     mock_paginator.paginate.return_value = mock_page_iterator.paginate.return_value
-    
+
     result = await cleanup.list_orphaned_uploads(prefix="archives/db1/")
-    
+
     assert len(result) == 1
     assert result[0]["key"] == "archives/db1/table1/file1.jsonl.gz"
 
@@ -112,7 +112,7 @@ async def test_list_orphaned_uploads_client_error(cleanup: MultipartCleanup, moc
         {"Error": {"Code": "AccessDenied", "Message": "Access denied"}},
         "ListMultipartUploads",
     )
-    
+
     with pytest.raises(S3Error, match="Failed to list multipart uploads"):
         await cleanup.list_orphaned_uploads()
 
@@ -134,10 +134,10 @@ async def test_list_orphaned_uploads_invalid_timestamp(cleanup: MultipartCleanup
             ]
         }
     ]
-    
+
     mock_s3_client.client.get_paginator.return_value = mock_paginator
     mock_paginator.paginate.return_value = mock_page_iterator.paginate.return_value
-    
+
     # Should not raise, but log warning
     result = await cleanup.list_orphaned_uploads()
     assert len(result) == 0
@@ -147,9 +147,9 @@ async def test_list_orphaned_uploads_invalid_timestamp(cleanup: MultipartCleanup
 async def test_abort_upload_success(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
     """Test successful abort of upload."""
     mock_s3_client.client.abort_multipart_upload.return_value = {}
-    
+
     await cleanup.abort_upload("test-key", "upload-id")
-    
+
     mock_s3_client.client.abort_multipart_upload.assert_called_once_with(
         Bucket="test-bucket", Key="test-key", UploadId="upload-id"
     )
@@ -162,7 +162,7 @@ async def test_abort_upload_not_found(cleanup: MultipartCleanup, mock_s3_client:
         {"Error": {"Code": "NoSuchUpload", "Message": "Upload not found"}},
         "AbortMultipartUpload",
     )
-    
+
     # Should not raise, just log
     await cleanup.abort_upload("test-key", "upload-id")
 
@@ -174,7 +174,7 @@ async def test_abort_upload_error(cleanup: MultipartCleanup, mock_s3_client: Mag
         {"Error": {"Code": "AccessDenied", "Message": "Access denied"}},
         "AbortMultipartUpload",
     )
-    
+
     with pytest.raises(S3Error, match="Failed to abort multipart upload"):
         await cleanup.abort_upload("test-key", "upload-id")
 
@@ -183,7 +183,7 @@ async def test_abort_upload_error(cleanup: MultipartCleanup, mock_s3_client: Mag
 async def test_cleanup_orphaned_uploads_dry_run(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
     """Test cleanup in dry-run mode."""
     stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
-    
+
     mock_paginator = MagicMock()
     mock_page_iterator = MagicMock()
     mock_page_iterator.paginate.return_value = [
@@ -198,12 +198,12 @@ async def test_cleanup_orphaned_uploads_dry_run(cleanup: MultipartCleanup, mock_
             ]
         }
     ]
-    
+
     mock_s3_client.client.get_paginator.return_value = mock_paginator
     mock_paginator.paginate.return_value = mock_page_iterator.paginate.return_value
-    
+
     result = await cleanup.cleanup_orphaned_uploads(dry_run=True)
-    
+
     assert result["total_found"] == 1
     assert result["aborted"] == 0
     mock_s3_client.client.abort_multipart_upload.assert_not_called()
@@ -213,7 +213,7 @@ async def test_cleanup_orphaned_uploads_dry_run(cleanup: MultipartCleanup, mock_
 async def test_cleanup_orphaned_uploads_with_failures(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
     """Test cleanup with some failures."""
     stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
-    
+
     mock_paginator = MagicMock()
     mock_page_iterator = MagicMock()
     mock_page_iterator.paginate.return_value = [
@@ -234,10 +234,10 @@ async def test_cleanup_orphaned_uploads_with_failures(cleanup: MultipartCleanup,
             ]
         }
     ]
-    
+
     mock_s3_client.client.get_paginator.return_value = mock_paginator
     mock_paginator.paginate.return_value = mock_page_iterator.paginate.return_value
-    
+
     # First abort succeeds, second fails
     def abort_side_effect(*args, **kwargs):
         if kwargs.get("UploadId") == "upload-2":
@@ -245,11 +245,11 @@ async def test_cleanup_orphaned_uploads_with_failures(cleanup: MultipartCleanup,
                 {"Error": {"Code": "AccessDenied", "Message": "Access denied"}},
                 "AbortMultipartUpload",
             )
-    
+
     mock_s3_client.client.abort_multipart_upload.side_effect = abort_side_effect
-    
+
     result = await cleanup.cleanup_orphaned_uploads(dry_run=False)
-    
+
     assert result["total_found"] == 2
     assert result["aborted"] == 1
     assert result["failed"] == 1
@@ -261,9 +261,9 @@ async def test_cleanup_for_database_table(cleanup: MultipartCleanup, mock_s3_cli
     """Test cleanup for specific database/table."""
     with patch.object(cleanup, "cleanup_orphaned_uploads", new_callable=AsyncMock) as mock_cleanup:
         mock_cleanup.return_value = {"total_found": 0, "aborted": 0, "failed": 0, "errors": []}
-        
+
         result = await cleanup.cleanup_for_database_table("db1", "table1", dry_run=True)
-        
+
         mock_cleanup.assert_called_once_with(prefix="db1/table1/", dry_run=True)
         assert result["total_found"] == 0
 
@@ -274,7 +274,7 @@ async def test_list_orphaned_uploads_with_max_age(cleanup: MultipartCleanup, moc
     mock_paginator = MagicMock()
     old_time = datetime.now(timezone.utc) - timedelta(hours=50)
     recent_time = datetime.now(timezone.utc) - timedelta(hours=10)
-    
+
     mock_page_iterator = MagicMock()
     mock_page_iterator.paginate.return_value = [
         {
@@ -294,12 +294,12 @@ async def test_list_orphaned_uploads_with_max_age(cleanup: MultipartCleanup, moc
             ]
         }
     ]
-    
+
     mock_s3_client.client.get_paginator.return_value = mock_paginator
     mock_paginator.paginate.return_value = mock_page_iterator.paginate.return_value
-    
+
     # Use max_age_hours=30, so only the 50-hour-old upload should be orphaned
     result = await cleanup.list_orphaned_uploads(max_age_hours=30)
-    
+
     assert len(result) == 1
     assert result[0]["key"] == "archives/db1/table1/file1.jsonl.gz"

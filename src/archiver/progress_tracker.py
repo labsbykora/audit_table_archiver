@@ -1,6 +1,5 @@
 """Real-time progress tracking and ETA calculation."""
 
-import sys
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -42,7 +41,7 @@ class ProgressTracker:
         self.batches_total: Optional[int] = None
         self.records_processed: int = 0
         self.records_total: Optional[int] = None
-        
+
         # Track both current run and overall progress
         self.records_processed_this_run: int = 0
         self.records_total_this_run: Optional[int] = None
@@ -111,13 +110,13 @@ class ProgressTracker:
         """
         self.records_processed = records_processed
         self.records_processed_total = records_processed
-        
+
         # Calculate this run's progress if not provided
         if records_processed_this_run is not None:
             self.records_processed_this_run = records_processed_this_run
         else:
             self.records_processed_this_run = records_processed - self.initial_records_from_checkpoint
-        
+
         self.batches_completed = batches_completed
         if batches_total is not None:
             self.batches_total = batches_total
@@ -168,14 +167,11 @@ class ProgressTracker:
         if not self.start_time:
             return
 
-        elapsed = datetime.now(timezone.utc) - self.start_time
-        elapsed_seconds = elapsed.total_seconds()
-
         # Calculate percentages
         percentage_overall = 0.0
         if self.records_total_overall and self.records_total_overall > 0:
             percentage_overall = min(100.0, (self.records_processed_total / self.records_total_overall) * 100)
-        
+
         percentage_this_run = 0.0
         if self.records_total_this_run and self.records_total_this_run > 0:
             percentage_this_run = min(100.0, (self.records_processed_this_run / self.records_total_this_run) * 100)
@@ -196,7 +192,7 @@ class ProgressTracker:
             progress_parts.append(f"DB: {self.current_database}")
         if self.current_table:
             progress_parts.append(f"Table: {self.current_table}")
-        
+
         # Show both current run and overall progress
         if self.records_total_this_run is not None and self.records_total_overall is not None:
             # Both metrics available - show both
@@ -213,7 +209,7 @@ class ProgressTracker:
         else:
             # No totals available
             progress_parts.append(f"Records: {self.records_processed_total:,}")
-        
+
         progress_parts.append(f"Batches: {self.batches_completed}")
         if self.batches_total:
             progress_parts.append(f"/ {self.batches_total}")

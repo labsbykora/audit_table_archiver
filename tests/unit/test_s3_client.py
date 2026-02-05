@@ -1,7 +1,6 @@
 """Unit tests for S3 client module."""
 
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

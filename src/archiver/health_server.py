@@ -1,15 +1,13 @@
 """HTTP server for health check endpoint."""
 
-import asyncio
 import json
 from typing import Optional
 
-import aiohttp
-from aiohttp import web
 import structlog
+from aiohttp import web
 
 from archiver.database import DatabaseManager
-from archiver.health_check import HealthChecker, HealthStatus
+from archiver.health_check import HealthChecker
 from archiver.s3_client import S3Client
 from utils.logging import get_logger
 

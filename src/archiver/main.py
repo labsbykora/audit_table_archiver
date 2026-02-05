@@ -1,6 +1,5 @@
 """Main entry point for the archiver CLI."""
 
-import logging as std_logging
 import sys
 from pathlib import Path
 from typing import Optional
@@ -16,7 +15,7 @@ src_path = Path(__file__).parent.parent.parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from utils.logging import configure_logging, get_logger
+from utils.logging import configure_logging  # noqa: E402
 
 
 @click.command()
@@ -80,7 +79,7 @@ def main(
     # Verbose mode automatically enables DEBUG level for more detailed output
     effective_log_level = "DEBUG" if verbose else log_level
     logger = configure_logging(log_level=effective_log_level, log_format=log_format)
-    
+
     # Suppress noisy third-party library logs in verbose mode
     # Keep boto3/botocore at WARNING level to reduce noise while keeping our DEBUG logs
     if verbose:

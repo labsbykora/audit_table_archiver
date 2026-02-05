@@ -1,18 +1,11 @@
 """Integration tests for multi-database support."""
 
 import os
-import sys
-from pathlib import Path
 
 import pytest
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
 from archiver.archiver import Archiver
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig, DefaultsConfig
+from archiver.config import ArchiverConfig, DatabaseConfig, DefaultsConfig, TableConfig
 
 # Fixtures are auto-discovered from conftest.py by pytest
 
@@ -23,11 +16,10 @@ async def test_sequential_multi_database_processing(
     archiver_config: ArchiverConfig, test_table: str
 ) -> None:
     """Test sequential processing of multiple databases."""
-    import os
-    
+
     # Set password environment variable
     os.environ.setdefault("DB_PASSWORD", "archiver_password")
-    
+
     # Create a second database configuration (using same test database for simplicity)
     # In real scenario, these would be different databases
     db1_config = DatabaseConfig(
@@ -81,11 +73,10 @@ async def test_database_failure_isolation(
     archiver_config: ArchiverConfig, test_table: str
 ) -> None:
     """Test that one database failure doesn't stop processing of other databases."""
-    import os
-    
+
     # Set password environment variable
     os.environ.setdefault("DB_PASSWORD", "archiver_password")
-    
+
     # Create config with one valid and one invalid database
     valid_db = DatabaseConfig(
         name="test_db",
@@ -149,11 +140,10 @@ async def test_per_database_statistics(
     archiver_config: ArchiverConfig, test_table: str
 ) -> None:
     """Test that per-database statistics are correctly tracked."""
-    import os
-    
+
     # Set password environment variable
     os.environ.setdefault("DB_PASSWORD", "archiver_password")
-    
+
     db_config = DatabaseConfig(
         name="test_db",
         host="localhost",
@@ -213,11 +203,10 @@ async def test_connection_pool_size_configuration(
     archiver_config: ArchiverConfig, test_table: str
 ) -> None:
     """Test that per-database connection pool size configuration works."""
-    import os
-    
+
     # Set password environment variable
     os.environ.setdefault("DB_PASSWORD", "archiver_password")
-    
+
     # Test with custom pool size
     db_config = DatabaseConfig(
         name="test_db",
@@ -261,11 +250,10 @@ async def test_parallel_database_processing(
     archiver_config: ArchiverConfig, test_table: str
 ) -> None:
     """Test parallel database processing (if enabled)."""
-    import os
-    
+
     # Set password environment variable
     os.environ.setdefault("DB_PASSWORD", "archiver_password")
-    
+
     # Create two database configs (using same DB for testing)
     db1 = DatabaseConfig(
         name="test_db",

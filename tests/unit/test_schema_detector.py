@@ -1,10 +1,11 @@
 """Unit tests for schema detection."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from archiver.schema_detector import SchemaDetector
+import pytest
+
 from archiver.database import DatabaseManager
+from archiver.schema_detector import SchemaDetector
 
 
 @pytest.fixture
@@ -41,14 +42,6 @@ async def test_detect_table_schema(mock_db_manager):
             "numeric_scale": None,
             "ordinal_position": 2,
         },
-    ]
-
-    # Mock primary key data
-    pk_data = [
-        {
-            "constraint_name": "test_table_pkey",
-            "column_name": "id",
-        }
     ]
 
     # Mock foreign keys (empty)
@@ -166,7 +159,7 @@ async def test_detect_table_schema_with_foreign_keys(mock_db_manager):
         "constraint_name": "test_table_pkey",
         "columns": ["id"],
     })
-    
+
     # Foreign key query returns rows with these fields
     fk_data = [
         {

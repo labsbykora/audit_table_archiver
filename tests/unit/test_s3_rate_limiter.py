@@ -1,9 +1,6 @@
 """Unit tests for S3 rate limiter."""
 
 import time
-from unittest.mock import MagicMock
-
-import pytest
 
 from archiver.s3_rate_limiter import S3RateLimiter, TokenBucket
 
@@ -59,7 +56,7 @@ class TestS3RateLimiter:
         # Consume all tokens
         for _ in range(20):
             limiter.acquire(wait=False)
-        
+
         # Next request should be throttled
         assert limiter.acquire(wait=False) is False
         assert limiter.throttled_requests > 0
@@ -68,9 +65,9 @@ class TestS3RateLimiter:
         """Test handling 503 SlowDown response."""
         limiter = S3RateLimiter(requests_per_second=10.0)
         original_rate = limiter.token_bucket.refill_rate
-        
+
         limiter.handle_slowdown(retry_after=1.0)
-        
+
         # Rate should be reduced
         assert limiter.token_bucket.refill_rate < original_rate
         assert limiter.token_bucket.refill_rate >= 1.0
@@ -86,7 +83,7 @@ class TestS3RateLimiter:
         """Test getting statistics."""
         limiter = S3RateLimiter(requests_per_second=10.0)
         limiter.acquire()
-        
+
         stats = limiter.get_stats()
         assert stats["total_requests"] == 1
         assert stats["current_rate"] == 10.0

@@ -5,13 +5,13 @@ from typing import Optional
 
 import structlog
 from prometheus_client import (
+    REGISTRY,
     CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
     generate_latest,
     start_http_server,
-    REGISTRY,
 )
 
 from utils.logging import get_logger

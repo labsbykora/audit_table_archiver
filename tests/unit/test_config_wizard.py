@@ -1,9 +1,10 @@
 """Unit tests for configuration wizard module."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from archiver.config import ArchiverConfig, S3Config, DatabaseConfig, TableConfig
+import pytest
+
+from archiver.config import ArchiverConfig
 from archiver.exceptions import DatabaseError
 from wizard.config_wizard import ConfigWizard
 
@@ -21,21 +22,21 @@ class TestConfigWizard:
         """Test successful table detection."""
         # Create a proper async context manager mock
         mock_conn = AsyncMock()
-        
+
         # Mock fetch result - asyncpg Record objects support dict-like access
         class MockRecord:
             def __init__(self, data):
                 self._data = data
             def __getitem__(self, key):
                 return self._data[key]
-        
+
         mock_row = MockRecord({
             "table_name": "audit_logs",
             "timestamp_columns": ["created_at", "updated_at"],
             "id_columns": ["id"],
         })
         mock_conn.fetch = AsyncMock(return_value=[mock_row])
-        
+
         # Mock fetchrow for primary key query
         mock_pk_row = MockRecord({"column_name": "id"})
         mock_conn.fetchrow = AsyncMock(return_value=mock_pk_row)
@@ -76,7 +77,7 @@ class TestConfigWizard:
     async def test_estimate_record_count(self, wizard):
         """Test record count estimation."""
         from datetime import datetime, timezone
-        
+
         mock_conn = AsyncMock()
         # Setup fetchval to return different values for different queries
         call_count = 0

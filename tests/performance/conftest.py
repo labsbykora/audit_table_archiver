@@ -4,16 +4,13 @@ import asyncio
 import os
 import subprocess
 import time
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import AsyncGenerator, Generator
 
 import asyncpg
 import pytest
-from botocore.client import BaseClient
 
 from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig
-from archiver.database import DatabaseManager
-from archiver.s3_client import S3Client
 
 
 @pytest.fixture(scope="session")
@@ -49,7 +46,7 @@ def postgres_ready(docker_compose_file: Path) -> Generator[None, None, None]:
                         database="test_db",
                     )
                     await conn.close()
-                
+
                 asyncio.run(check_connection())
                 break
             except Exception:

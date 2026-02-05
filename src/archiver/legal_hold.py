@@ -1,7 +1,7 @@
 """Legal hold checking to prevent archival of held data."""
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
 
@@ -181,7 +181,7 @@ class LegalHoldChecker:
         # Query for active legal holds
         # Expected columns: table_name, schema_name, reason, start_date, expiration_date, requestor, where_clause
         query = f"""
-            SELECT 
+            SELECT
                 table_name,
                 schema_name,
                 reason,

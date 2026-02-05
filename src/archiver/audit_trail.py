@@ -196,7 +196,7 @@ class AuditTrail:
 
         # Create index on timestamp for efficient queries
         create_index_query = """
-            CREATE INDEX IF NOT EXISTS idx_archiver_audit_log_timestamp 
+            CREATE INDEX IF NOT EXISTS idx_archiver_audit_log_timestamp
             ON archiver_audit_log(timestamp DESC)
         """
 

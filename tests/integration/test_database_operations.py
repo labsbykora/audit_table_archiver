@@ -1,17 +1,10 @@
 """Integration tests for database operations."""
 
-import sys
-from pathlib import Path
 
 import pytest
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-from archiver.database import DatabaseManager
 from archiver.config import DatabaseConfig
+from archiver.database import DatabaseManager
 
 # Fixtures are auto-discovered from conftest.py by pytest
 
@@ -21,6 +14,7 @@ from archiver.config import DatabaseConfig
 async def test_database_manager_connect() -> None:
     """Test database manager can connect."""
     import os
+
     from archiver.config import TableConfig
 
     os.environ["TEST_DB_PASSWORD"] = "archiver_password"
@@ -61,6 +55,7 @@ async def test_database_manager_connect() -> None:
 async def test_database_manager_transaction(db_connection, test_table: str) -> None:
     """Test database manager transaction."""
     import os
+
     from archiver.config import TableConfig
 
     os.environ["TEST_DB_PASSWORD"] = "archiver_password"

@@ -2,11 +2,9 @@
 
 import base64
 import json
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
-
-import pytest
 
 from archiver.serializer import PostgreSQLSerializer
 

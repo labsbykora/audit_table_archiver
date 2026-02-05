@@ -1,12 +1,8 @@
 """Unit tests for deletion manifest generation."""
 
 import json
-from datetime import datetime, timezone
-
-import pytest
 
 from archiver.deletion_manifest import DeletionManifestGenerator
-from utils.checksum import ChecksumCalculator
 
 
 def test_generate_manifest():

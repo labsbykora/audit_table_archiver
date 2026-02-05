@@ -1,19 +1,10 @@
 """Integration tests for checkpoint and resume functionality."""
 
-import asyncio
-import json
-import sys
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root / "src"))
+from datetime import datetime, timedelta, timezone
 
 import pytest
+
 from archiver.checkpoint import Checkpoint, CheckpointManager
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig
-from archiver.s3_client import S3Client
 
 
 @pytest.mark.asyncio

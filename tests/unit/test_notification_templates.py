@@ -1,8 +1,6 @@
 """Unit tests for notification templates."""
 
-from datetime import datetime, timezone
 
-import pytest
 
 from archiver.notification_templates import NotificationTemplate
 

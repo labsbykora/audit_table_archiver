@@ -8,41 +8,33 @@ from pathlib import Path
 from typing import Any, Optional
 
 import structlog
+from prometheus_client import CollectorRegistry
 
+from archiver.audit_trail import AuditEventType, AuditTrail
 from archiver.batch_processor import BatchProcessor
+from archiver.checkpoint import Checkpoint, CheckpointManager
 from archiver.compressor import Compressor
-from archiver.config import ArchiverConfig, DatabaseConfig, TableConfig, MonitoringConfig, NotificationConfig
+from archiver.config import ArchiverConfig, DatabaseConfig, MonitoringConfig, TableConfig
 from archiver.database import DatabaseManager
-from archiver.exceptions import (
-    ArchiverError,
-    ConfigurationError,
-    DatabaseError,
-    S3Error,
-    TransactionError,
-    VerificationError,
-)
-from archiver.s3_client import S3Client
-from archiver.serializer import PostgreSQLSerializer
-from archiver.transaction_manager import TransactionManager
-from archiver.verifier import Verifier
-from archiver.metadata import MetadataGenerator
 from archiver.deletion_manifest import DeletionManifestGenerator
+from archiver.exceptions import ConfigurationError, VerificationError
+from archiver.health_check import HealthChecker
+from archiver.health_server import HealthCheckServer
+from archiver.legal_hold import LegalHoldChecker
+from archiver.locking import LockError, LockManager
+from archiver.metadata import MetadataGenerator
+from archiver.metrics import ArchiverMetrics
+from archiver.multipart_cleanup import MultipartCleanup
+from archiver.notification_manager import EnhancedNotificationManager
+from archiver.progress_tracker import ProgressTracker
+from archiver.retention_policy import RetentionPolicyEnforcer
+from archiver.s3_client import S3Client
 from archiver.sample_verifier import SampleVerifier
 from archiver.schema_detector import SchemaDetector
 from archiver.schema_drift import SchemaDriftDetector
+from archiver.serializer import PostgreSQLSerializer
+from archiver.verifier import Verifier
 from archiver.watermark_manager import WatermarkManager
-from archiver.locking import LockManager, LockError
-from archiver.checkpoint import CheckpointManager, Checkpoint
-from archiver.multipart_cleanup import MultipartCleanup
-from archiver.legal_hold import LegalHoldChecker
-from archiver.retention_policy import RetentionPolicyEnforcer
-from archiver.audit_trail import AuditTrail, AuditEventType
-from archiver.metrics import ArchiverMetrics
-from prometheus_client import CollectorRegistry
-from archiver.progress_tracker import ProgressTracker
-from archiver.health_check import HealthChecker
-from archiver.health_server import HealthCheckServer
-from archiver.notification_manager import EnhancedNotificationManager
 from utils.checksum import ChecksumCalculator
 from utils.logging import get_logger
 
@@ -93,7 +85,7 @@ class Archiver:
             checkpoint_interval=10,  # TODO: Make configurable
             logger=self.logger,
         )
-        
+
         # Initialize legal hold checker if configured
         if config.legal_holds:
             self.legal_hold_checker = LegalHoldChecker(
@@ -106,7 +98,7 @@ class Archiver:
             )
         else:
             self.legal_hold_checker = LegalHoldChecker(enabled=False, logger=self.logger)
-        
+
         # Initialize retention policy enforcer if configured
         if config.compliance:
             self.retention_enforcer = RetentionPolicyEnforcer(
@@ -115,13 +107,13 @@ class Archiver:
             )
         else:
             self.retention_enforcer = RetentionPolicyEnforcer(logger=self.logger)
-        
+
         # Initialize audit trail
         self.audit_trail = AuditTrail(
             storage_type="s3",  # TODO: Make configurable
             logger=self.logger,
         )
-        
+
         # Initialize monitoring components
         monitoring_config = config.monitoring or MonitoringConfig()
         self.metrics = ArchiverMetrics(logger=self.logger, registry=CollectorRegistry()) if monitoring_config.metrics_enabled else None
@@ -132,7 +124,7 @@ class Archiver:
         ) if monitoring_config.progress_enabled else None
         self.health_checker = HealthChecker(logger=self.logger) if monitoring_config.health_check_enabled else None
         self.health_server: Optional[HealthCheckServer] = None
-        
+
         # Start metrics server if enabled
         if self.metrics and monitoring_config.metrics_enabled:
             try:
@@ -143,7 +135,7 @@ class Archiver:
                     port=monitoring_config.metrics_port,
                     error=str(e),
                 )
-        
+
         # Initialize notification manager if configured
         if config.notifications and config.notifications.enabled:
             self.notification_manager = EnhancedNotificationManager(
@@ -192,7 +184,7 @@ class Archiver:
                 await self._archive_database_with_stats(db_config, stats)
 
         stats["end_time"] = datetime.now(timezone.utc).isoformat()
-        
+
         # Determine final status
         if stats["databases_failed"] == 0 and stats["tables_failed"] == 0:
             final_status = "success"
@@ -200,15 +192,15 @@ class Archiver:
             final_status = "partial"
         else:
             final_status = "failure"
-        
+
         # Record run status in metrics
         if self.metrics:
             self.metrics.record_run_status(final_status)
-        
+
         # Finish progress tracking
         if self.progress_tracker:
             self.progress_tracker.finish(success=(final_status == "success"))
-        
+
         # Stop health check server
         if self.health_server:
             try:
@@ -218,7 +210,7 @@ class Archiver:
                     "Failed to stop health check server",
                     error=str(e),
                 )
-        
+
         # Send digest notification if enabled
         if self.notification_manager and self.config.notifications and self.config.notifications.digest_mode:
             try:
@@ -228,7 +220,7 @@ class Archiver:
                     "Failed to send digest notification (non-critical)",
                     error=str(e),
                 )
-        
+
         # Close notification manager
         if self.notification_manager:
             try:
@@ -238,9 +230,9 @@ class Archiver:
                     "Failed to close notification manager",
                     error=str(e),
                 )
-        
+
         self.logger.info("Archival process completed", **stats)
-        
+
         # Print formatted summary if not in JSON log mode
         # Check if console format is being used (not JSON)
         try:
@@ -385,11 +377,11 @@ class Archiver:
                     stats["tables_processed"] += 1
                     if db_stats is not None:
                         db_stats["tables_processed"] += 1
-                    
+
                     # Get records archived from stats
                     records_archived = stats.get("records_archived", 0)
                     duration = (datetime.now(timezone.utc) - table_start_time).total_seconds()
-                    
+
                     # Log success to audit trail
                     await self.audit_trail.log_event(
                         event_type=AuditEventType.ARCHIVE_SUCCESS,
@@ -412,12 +404,12 @@ class Archiver:
                         error=str(e),
                         exc_info=True,
                     )
-                    
+
                     # Log failure to audit trail
                     duration = (datetime.now(timezone.utc) - table_start_time).total_seconds()
                     records_archived_before_failure = stats.get("records_archived", 0)
                     batches_processed_before_failure = stats.get("batches_processed", 0)
-                    
+
                     await self.audit_trail.log_event(
                         event_type=AuditEventType.ARCHIVE_FAILURE,
                         database_name=db_config.name,
@@ -429,7 +421,7 @@ class Archiver:
                         error_message=str(e),
                         s3_client=s3_client,
                     )
-                    
+
                     # Send failure notification
                     if self.notification_manager:
                         try:
@@ -500,7 +492,7 @@ class Archiver:
             schema_name=table_config.schema_name,
             db_manager=db_manager,
         )
-        
+
         if legal_hold and legal_hold.is_active():
             self.logger.warning(
                 "Table has active legal hold - skipping archival",
@@ -512,7 +504,7 @@ class Archiver:
                 expiration_date=legal_hold.expiration_date,
             )
             stats["tables_skipped"] = stats.get("tables_skipped", 0) + 1
-            
+
             # Log to audit trail
             await self.audit_trail.log_event(
                 event_type=AuditEventType.ARCHIVE_FAILURE,
@@ -620,7 +612,7 @@ class Archiver:
             table=table_config.name,
             count=eligible_count,
         )
-        
+
         # Load checkpoint for resuming interrupted runs (before progress tracking)
         checkpoint: Optional[Checkpoint] = None
         if not self.dry_run:
@@ -675,7 +667,7 @@ class Archiver:
                     table=table_config.name,
                     error=str(e),
                 )
-        
+
         # Calculate total records for progress tracking
         # When resuming from checkpoint, total = current eligible + already archived
         # This ensures percentage doesn't exceed 100% when resuming
@@ -684,7 +676,7 @@ class Archiver:
         if checkpoint:
             records_total_for_progress = eligible_count + checkpoint.records_archived
             initial_records_from_checkpoint = checkpoint.records_archived
-        
+
         # Set eligible records in metrics
         if self.metrics:
             self.metrics.set_records_eligible(
@@ -693,7 +685,7 @@ class Archiver:
                 schema=table_config.schema_name,
                 count=eligible_count,
             )
-        
+
         # Start progress tracking
         if self.progress_tracker:
             self.progress_tracker.start(
@@ -704,7 +696,7 @@ class Archiver:
                 records_total_this_run=eligible_count,  # This run only
                 initial_records_processed=initial_records_from_checkpoint,
             )
-        
+
         # Send notification on archive start (if enabled)
         if self.notification_manager:
             try:
@@ -824,7 +816,7 @@ class Archiver:
                     # Use the maximum overall across all tables to show total progress
                     if records_archived_so_far > stats.get("records_archived_total", 0):
                         stats["records_archived_total"] = records_archived_so_far
-                    
+
                     # Delete checkpoint on successful completion
                     if not self.dry_run:
                         try:
@@ -846,11 +838,11 @@ class Archiver:
                                 table=table_config.name,
                                 error=str(e),
                             )
-                    
+
                     # Finish progress tracking
                     if self.progress_tracker:
                         self.progress_tracker.finish(success=True)
-                    
+
                     # Log completion to audit trail (will be logged again at table level, but this is for batch-level tracking)
                     duration = (datetime.now(timezone.utc) - archive_start_time).total_seconds()
                     await self.audit_trail.log_event(
@@ -863,7 +855,7 @@ class Archiver:
                         duration_seconds=duration,
                         s3_client=s3_client,
                     )
-                    
+
                     # Send success notification
                     if self.notification_manager:
                         try:
@@ -887,7 +879,7 @@ class Archiver:
                                 table=table_config.name,
                                 error=str(e),
                             )
-                    
+
                     break
 
                 # Process batch
@@ -912,14 +904,14 @@ class Archiver:
                 records_archived_so_far += len(records)
                 records_archived_this_run += len(records)  # Track this run separately
                 batches_processed_so_far += 1
-                
+
                 is_first_batch = False  # Mark that first batch is done
-                
+
                 # Update per-database stats if provided
                 if db_stats is not None:
                     db_stats["batches_processed"] += 1
                     db_stats["records_archived"] += len(records)
-                
+
                 # Update progress tracker with both current run and overall
                 if self.progress_tracker:
                     self.progress_tracker.update(
@@ -928,7 +920,7 @@ class Archiver:
                         batches_total=None,  # We don't know total batches ahead of time
                         records_processed_this_run=records_archived_this_run,  # This run only
                     )
-                
+
                 # Update metrics batch progress
                 if self.metrics and eligible_count > 0:
                     progress = records_archived_so_far / eligible_count
@@ -1065,13 +1057,13 @@ class Archiver:
 
         # Extract primary keys for verification
         primary_keys = batch_processor.extract_primary_keys(record_dicts)
-        
+
         # Count records in database that match this batch's primary keys
         # This is the actual count we're about to delete
         pk_col = table_config.primary_key
         schema = table_config.schema_name
         table = table_config.name
-        
+
         # Count records with these primary keys (for verification)
         count_query = f"""
             SELECT COUNT(*)
@@ -1095,7 +1087,7 @@ class Archiver:
 
         jsonl_data = self.serializer.to_jsonl(serialized_rows)
         s3_count = self.serializer.count_jsonl_lines(jsonl_data)
-        
+
         # Record serialize duration
         if self.metrics:
             self.metrics.stop_phase_timer(
@@ -1126,7 +1118,7 @@ class Archiver:
                 schema=table_config.schema_name,
                 phase="compress",
             )
-        
+
         # Calculate checksum of compressed data
         compressed_checksum = self.checksum_calculator.calculate_sha256(compressed_data)
         self.logger.debug(
@@ -1180,12 +1172,12 @@ class Archiver:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
                 tmp_path = Path(tmp_file.name)
                 tmp_path.write_bytes(compressed_data)
-            
+
             # Close the file handle before uploading (fixes Windows file locking issue)
             try:
                 if self.metrics:
                     self.metrics.start_phase_timer("upload")
-                upload_result = s3_client.upload_file(tmp_path, s3_key)
+                _ = s3_client.upload_file(tmp_path, s3_key)
                 if self.metrics:
                     self.metrics.stop_phase_timer(
                         database=db_config.name,
@@ -1218,11 +1210,11 @@ class Archiver:
                 metadata_key = f"{prefix}/{db_config.name}/{table_config.name}/{date_partition}/{metadata_filename}"
             else:
                 metadata_key = f"{db_config.name}/{table_config.name}/{date_partition}/{metadata_filename}"
-            
+
             with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_meta_file:
                 tmp_meta_path = Path(tmp_meta_file.name)
                 tmp_meta_file.write(metadata_json)
-            
+
             try:
                 s3_client.upload_file(tmp_meta_path, metadata_key)
                 self.logger.debug(
@@ -1314,7 +1306,7 @@ class Archiver:
                     schema=table_config.schema_name,
                     phase="delete",
                 )
-            
+
             # Record archived records and bytes in metrics
             if self.metrics:
                 self.metrics.record_archived(
@@ -1324,7 +1316,7 @@ class Archiver:
                     count=memory_count,
                     bytes_uploaded=compressed_size,
                 )
-                
+
                 # Record batch processing (duration is already recorded per phase)
                 # We can calculate total batch duration from the phase durations
                 # For now, we'll use a simple approach: record batch with estimated duration
@@ -1400,7 +1392,7 @@ class Archiver:
                     s3_data = s3_client.get_object_bytes(s3_key)
 
                     # Extract sample records from S3 data
-                    sample_records = self.sample_verifier.extract_samples_from_s3(
+                    _ = self.sample_verifier.extract_samples_from_s3(
                         s3_data=s3_data,
                         primary_key_column=table_config.primary_key,
                         sample_pks=sample_pks,
@@ -1450,7 +1442,7 @@ class Archiver:
             batch=batch_number,
             records=len(records),
         )
-        
+
         # Return S3 key for tracking at table level
         return s3_key
 

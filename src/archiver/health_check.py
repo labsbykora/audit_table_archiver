@@ -1,6 +1,5 @@
 """Health check endpoint for monitoring."""
 
-import asyncio
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -126,7 +125,7 @@ class HealthChecker:
                             break
                     if has_healthy:
                         break
-            
+
             status = "degraded" if has_healthy else "unhealthy"
 
         return HealthStatus(

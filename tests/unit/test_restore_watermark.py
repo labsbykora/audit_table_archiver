@@ -2,13 +2,12 @@
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from archiver.database import DatabaseManager
-from archiver.exceptions import DatabaseError, S3Error
+from archiver.exceptions import S3Error
 from archiver.s3_client import S3Client
 from restore.restore_watermark import RestoreWatermark, RestoreWatermarkManager
 
@@ -270,14 +269,6 @@ class TestRestoreWatermarkManager:
         s3_client.config.prefix = "archives"
         s3_client.upload_file = Mock()
 
-        watermark = RestoreWatermark(
-            database_name="test_db",
-            table_name="test_table",
-            last_restored_date=datetime(2026, 1, 8, tzinfo=timezone.utc),
-            last_restored_s3_key="archives/test_db/test_table/year=2026/month=01/day=08/batch_001.jsonl.gz",
-            total_archives_restored=5,
-        )
-
         with patch("tempfile.NamedTemporaryFile") as mock_temp:
             mock_file = Mock()
             mock_file.name = "/tmp/test_watermark.json"
@@ -347,14 +338,6 @@ class TestRestoreWatermarkManager:
 
         db_manager = Mock(spec=DatabaseManager)
         db_manager.execute = AsyncMock()
-
-        watermark = RestoreWatermark(
-            database_name="test_db",
-            table_name="test_table",
-            last_restored_date=datetime(2026, 1, 8, tzinfo=timezone.utc),
-            last_restored_s3_key="archives/test_db/test_table/year=2026/month=01/day=08/batch_001.jsonl.gz",
-            total_archives_restored=5,
-        )
 
         await manager.save_watermark(
             "test_db",

@@ -2,8 +2,6 @@
 
 import json
 import random
-import tempfile
-from pathlib import Path
 from typing import Any, Optional
 
 import structlog

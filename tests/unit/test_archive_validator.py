@@ -1,13 +1,14 @@
 """Unit tests for archive validation module."""
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from archiver.config import S3Config
 from archiver.exceptions import S3Error, VerificationError
-from validate.archive_validator import ArchiveValidator, ValidationResult
 from restore.s3_reader import ArchiveFile
+from validate.archive_validator import ArchiveValidator, ValidationResult
 
 
 class TestValidationResult:

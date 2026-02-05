@@ -2,14 +2,14 @@
 
 import asyncio
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 import structlog
 
 from archiver.database import DatabaseManager
-from archiver.exceptions import ArchiverError, LockError
+from archiver.exceptions import LockError
 from utils.logging import get_logger
 
 
@@ -259,10 +259,6 @@ class LockManager:
             acquired = await db_manager.fetchval(query, lock_id)
 
             if not acquired:
-                # Check if lock is stale (older than 2x TTL)
-                stale_threshold = datetime.now(timezone.utc) - timedelta(
-                    seconds=self.lock_ttl_seconds * 2
-                )
                 # For PostgreSQL, we can't easily check lock age, so we'll just fail
                 raise LockError(
                     f"Lock already held: {lock_key}",

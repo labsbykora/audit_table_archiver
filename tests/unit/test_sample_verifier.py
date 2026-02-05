@@ -1,9 +1,10 @@
 """Unit tests for sample verifier."""
 
-import json
 import gzip
-import pytest
+import json
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from archiver.sample_verifier import SampleVerifier
 
@@ -142,7 +143,6 @@ def test_extract_samples_from_s3_missing():
 @pytest.mark.asyncio
 async def test_verify_samples_not_in_database():
     """Test verifying samples are not in database."""
-    from unittest.mock import AsyncMock, MagicMock
     from archiver.database import DatabaseManager
 
     verifier = SampleVerifier()
@@ -169,7 +169,6 @@ async def test_verify_samples_not_in_database():
 @pytest.mark.asyncio
 async def test_verify_samples_found_in_database():
     """Test that verification fails when samples are found in database."""
-    from unittest.mock import AsyncMock, MagicMock
     from archiver.database import DatabaseManager
     from archiver.exceptions import VerificationError
 

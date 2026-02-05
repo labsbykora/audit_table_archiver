@@ -1,9 +1,7 @@
 """Unit tests for metadata generation."""
 
 import json
-from datetime import datetime, timezone, timedelta
-
-import pytest
+from datetime import datetime, timedelta, timezone
 
 from archiver.metadata import MetadataGenerator
 

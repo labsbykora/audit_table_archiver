@@ -1,24 +1,16 @@
 """Integration tests for Phase 4: Archive validation utility."""
 
-import asyncio
 import json
 import os
-import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-import tempfile
 
 import pytest
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
 from archiver.config import S3Config
-from archiver.s3_client import S3Client
-from validate.archive_validator import ArchiveValidator
 from utils.checksum import ChecksumCalculator
+from validate.archive_validator import ArchiveValidator
 
 
 @pytest.mark.integration
@@ -36,10 +28,10 @@ async def test_validate_archive_integration(
         prefix="test/",
         endpoint=os.getenv("S3_ENDPOINT", "http://localhost:9000"),
     )
-    
+
     # Get data from database
     rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
-    
+
     # Create valid archive
     jsonl_content = "\n".join(
         json.dumps({
@@ -51,26 +43,26 @@ async def test_validate_archive_integration(
         })
         for row in rows
     )
-    
+
     import gzip
     jsonl_bytes = jsonl_content.encode("utf-8")
     compressed = gzip.compress(jsonl_bytes)
-    
+
     checksum_calc = ChecksumCalculator()
     checksum = checksum_calc.calculate_sha256(jsonl_bytes)  # Calculate on uncompressed data
-    
+
     # Upload data file - write to temp file first
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
         tmp_file.write(compressed)
         tmp_file_path = Path(tmp_file.name)
-    
+
     try:
         s3_key = f"test_db/public/{test_table}/year=2026/month=01/day=06/valid_archive.jsonl.gz"
         s3_client.upload_file(
             file_path=tmp_file_path,
             s3_key=s3_key,
         )
-        
+
         metadata = {
         "batch_info": {
             "batch_id": "valid_archive",
@@ -88,12 +80,12 @@ async def test_validate_archive_integration(
             "jsonl_sha256": checksum,
         },
     }
-    
+
         metadata_key = s3_key.replace(".jsonl.gz", ".metadata.json")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w") as meta_file:
             json.dump(metadata, meta_file, indent=2)
             meta_file_path = Path(meta_file.name)
-        
+
         try:
             s3_client.upload_file(
                 file_path=meta_file_path,
@@ -103,11 +95,11 @@ async def test_validate_archive_integration(
             meta_file_path.unlink(missing_ok=True)
     finally:
         tmp_file_path.unlink(missing_ok=True)
-    
+
     # Validate archive
     validator = ArchiveValidator(s3_config)
     result = await validator.validate_archive(s3_key, validate_record_count=True)
-    
+
     assert result["valid"] is True
     assert len(result["errors"]) == 0
 
@@ -127,10 +119,10 @@ async def test_validate_archive_checksum_mismatch(
         prefix="test/",
         endpoint=os.getenv("S3_ENDPOINT", "http://localhost:9000"),
     )
-    
+
     # Get data from database
     rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
-    
+
     jsonl_content = "\n".join(
         json.dumps({
             "id": row["id"],
@@ -141,26 +133,26 @@ async def test_validate_archive_checksum_mismatch(
         })
         for row in rows
     )
-    
+
     import gzip
     compressed = gzip.compress(jsonl_content.encode("utf-8"))
-    
+
     # Use wrong checksum
     wrong_checksum = "wrong_checksum_value"
-    
+
     # Upload data file - write to temp file first
     import tempfile
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
         tmp_file.write(compressed)
         tmp_file_path = Path(tmp_file.name)
-    
+
     try:
         s3_key = f"test_db/public/{test_table}/year=2026/month=01/day=06/invalid_checksum.jsonl.gz"
         s3_client.upload_file(
             file_path=tmp_file_path,
             s3_key=s3_key,
         )
-        
+
         metadata = {
             "batch_info": {
                 "batch_id": "invalid_checksum",
@@ -178,12 +170,12 @@ async def test_validate_archive_checksum_mismatch(
                 "jsonl_sha256": wrong_checksum,
             },
         }
-        
+
         metadata_key = s3_key.replace(".jsonl.gz", ".metadata.json")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w") as meta_file:
             json.dump(metadata, meta_file, indent=2)
             meta_file_path = Path(meta_file.name)
-        
+
         try:
             s3_client.upload_file(
                 file_path=meta_file_path,
@@ -193,7 +185,7 @@ async def test_validate_archive_checksum_mismatch(
             meta_file_path.unlink(missing_ok=True)
     finally:
         tmp_file_path.unlink(missing_ok=True)
-    
+
     # Validate archive - should fail - use the full key with prefix
     full_s3_key = f"test/{s3_key}"
     validator = ArchiveValidator(s3_config)
@@ -202,7 +194,7 @@ async def test_validate_archive_checksum_mismatch(
         validate_checksum=True,
         validate_record_count=False,
     )
-    
+
     assert result["valid"] is False
     assert any("checksum" in error.lower() for error in result["errors"])
 
@@ -222,11 +214,11 @@ async def test_validate_archive_record_count_mismatch(
         prefix="test/",
         endpoint=os.getenv("S3_ENDPOINT", "http://localhost:9000"),
     )
-    
+
     # Get data from database
     all_rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
     half_rows = all_rows[:len(all_rows)//2]  # Only half the records
-    
+
     # Create archive with fewer records than metadata claims
     jsonl_content = "\n".join(
         json.dumps({
@@ -238,27 +230,27 @@ async def test_validate_archive_record_count_mismatch(
         })
         for row in half_rows
     )
-    
+
     import gzip
     jsonl_bytes = jsonl_content.encode("utf-8")
     compressed = gzip.compress(jsonl_bytes)
-    
+
     checksum_calc = ChecksumCalculator()
     checksum = checksum_calc.calculate_sha256(jsonl_bytes)  # Calculate on uncompressed data
-    
+
     # Upload data file - write to temp file first
     import tempfile
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
         tmp_file.write(compressed)
         tmp_file_path = Path(tmp_file.name)
-    
+
     try:
         s3_key = f"test_db/public/{test_table}/year=2026/month=01/day=06/count_mismatch.jsonl.gz"
         s3_client.upload_file(
             file_path=tmp_file_path,
             s3_key=s3_key,
         )
-        
+
         # Metadata claims all records
         metadata = {
             "batch_info": {
@@ -277,12 +269,12 @@ async def test_validate_archive_record_count_mismatch(
                 "jsonl_sha256": checksum,
             },
         }
-        
+
         metadata_key = s3_key.replace(".jsonl.gz", ".metadata.json")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w") as meta_file:
             json.dump(metadata, meta_file, indent=2)
             meta_file_path = Path(meta_file.name)
-        
+
         try:
             s3_client.upload_file(
                 file_path=meta_file_path,
@@ -292,11 +284,11 @@ async def test_validate_archive_record_count_mismatch(
             meta_file_path.unlink(missing_ok=True)
     finally:
         tmp_file_path.unlink(missing_ok=True)
-    
+
     # Validate archive - should detect mismatch
     validator = ArchiveValidator(s3_config)
     result = await validator.validate_archive(s3_key, validate_record_count=True)
-    
+
     assert result["valid"] is False
     assert any("record count" in error.lower() for error in result["errors"])
 
@@ -316,10 +308,10 @@ async def test_validate_all_archives(
         prefix="test/",
         endpoint=os.getenv("S3_ENDPOINT", "http://localhost:9000"),
     )
-    
+
     # Get data from database
     base_rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
-    
+
     # Create multiple archives
     temp_files = []
     try:
@@ -334,26 +326,26 @@ async def test_validate_all_archives(
                 })
                 for row in base_rows
             )
-            
+
             import gzip
             jsonl_bytes = jsonl_content.encode("utf-8")
             compressed = gzip.compress(jsonl_bytes)
-            
+
             checksum_calc = ChecksumCalculator()
             checksum = checksum_calc.calculate_sha256(jsonl_bytes)  # Calculate on uncompressed data
-            
+
             # Write to temp file
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
                 tmp_file.write(compressed)
                 tmp_file_path = Path(tmp_file.name)
                 temp_files.append(tmp_file_path)
-            
+
             s3_key = f"test_db/public/{test_table}/year=2026/month=01/day=06/archive_{i}.jsonl.gz"
             s3_client.upload_file(
                 file_path=tmp_file_path,
                 s3_key=s3_key,
             )
-            
+
             metadata = {
                 "batch_info": {
                     "batch_id": f"archive_{i}",
@@ -371,13 +363,13 @@ async def test_validate_all_archives(
                     "jsonl_sha256": checksum,
                 },
             }
-            
+
             metadata_key = s3_key.replace(".jsonl.gz", ".metadata.json")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w") as meta_file:
                 json.dump(metadata, meta_file, indent=2)
                 meta_file_path = Path(meta_file.name)
                 temp_files.append(meta_file_path)
-            
+
             s3_client.upload_file(
                 file_path=meta_file_path,
                 s3_key=metadata_key,
@@ -386,7 +378,7 @@ async def test_validate_all_archives(
         # Cleanup temp files
         for tmp_file in temp_files:
             tmp_file.unlink(missing_ok=True)
-    
+
     # Validate all archives
     validator = ArchiveValidator(s3_config)
     result = await validator.validate_archives(
@@ -395,7 +387,7 @@ async def test_validate_all_archives(
         validate_checksum=True,
         validate_record_count=True,
     )
-    
+
     assert result.total_archives == 3
     assert result.valid_archives == 3
     assert result.invalid_archives == 0

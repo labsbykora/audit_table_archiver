@@ -295,7 +295,7 @@ class RestoreWatermarkManager:
         """
         # Watermark key: {prefix}/{database}/{table}/.restore_watermark.json
         watermark_key = f"{database_name}/{table_name}/.restore_watermark.json"
-        
+
         # Add prefix if configured
         if s3_client.config.prefix:
             prefix = s3_client.config.prefix.rstrip("/")
@@ -363,7 +363,7 @@ class RestoreWatermarkManager:
 
         watermark_json = json.dumps(watermark.to_dict(), indent=2, default=str)
         watermark_key = f"{watermark.database_name}/{watermark.table_name}/.restore_watermark.json"
-        
+
         # Add prefix if configured
         if s3_client.config.prefix:
             prefix = s3_client.config.prefix.rstrip("/")

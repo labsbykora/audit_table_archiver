@@ -3,8 +3,7 @@
 import gzip
 import json
 from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -117,7 +116,7 @@ class TestS3ArchiveReader:
             reader = S3ArchiveReader(s3_config)
             # Replace the s3_client instance with our mock
             reader.s3_client = mock_s3_client
-            
+
             archive = await reader.read_archive("test.jsonl.gz", validate_checksum=False)
 
             assert archive.s3_key == "test.jsonl.gz"
@@ -237,7 +236,6 @@ class TestS3ArchiveReader:
     @pytest.mark.asyncio
     async def test_list_archives_with_date_filter(self, s3_config: S3Config) -> None:
         """Test listing archives with date filter."""
-        from datetime import datetime, timezone
 
         mock_objects = [
             {"Key": "archives/db/table/year=2026/month=01/day=04/file1.jsonl.gz"},

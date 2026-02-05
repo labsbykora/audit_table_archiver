@@ -1,19 +1,17 @@
 """Edge case tests for restore operations."""
 
-import json
 import gzip
+import json
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-import tempfile
 
 import pytest
 
+from archiver.config import DatabaseConfig, S3Config, TableConfig
+from archiver.exceptions import DatabaseError, S3Error
 from restore.restore_engine import RestoreEngine
 from restore.s3_reader import S3ArchiveReader
-from restore.conflict_resolver import ConflictResolver
-from archiver.config import DatabaseConfig, S3Config, TableConfig
-from archiver.database import DatabaseManager
-from archiver.s3_client import S3Client
 from utils.checksum import ChecksumCalculator
 
 
@@ -225,7 +223,7 @@ async def test_restore_partial_failure_rollback(
     )
 
     # Restore should fail and rollback
-    with pytest.raises(Exception):  # Should raise error
+    with pytest.raises(DatabaseError):
         await restore_engine.restore_archive(
             s3_key=s3_key,
             conflict_strategy="skip",
@@ -266,26 +264,10 @@ async def test_restore_corrupted_archive(
         endpoint="http://localhost:9000",
     )
 
-    db_config = DatabaseConfig(
-        name="test_db",
-        host="localhost",
-        port=5432,
-        user="archiver",
-        password_env="TEST_DB_PASSWORD",
-        tables=[
-            TableConfig(
-                name=test_table,
-                schema="public",
-                timestamp_column="created_at",
-                primary_key="id",
-            )
-        ],
-    )
-
     s3_reader = S3ArchiveReader(s3_config=s3_config)
 
     # Should raise error when trying to read corrupted file
-    with pytest.raises(Exception):  # Should raise decompression error
+    with pytest.raises(S3Error):
         await s3_reader.read_archive(s3_key=s3_key)
 
     # Cleanup

@@ -72,13 +72,13 @@ class RestoreEngine:
         # Use provided table/schema names as fallback if archive doesn't have them
         target_table_name = table_name or archive.table_name
         target_schema_name = schema_name or archive.schema_name or "public"
-        
+
         if not target_table_name:
             raise DatabaseError(
                 "Table name is required but not found in archive metadata or CLI arguments",
                 context={"archive_table": archive.table_name, "provided_table": table_name},
             )
-        
+
         self.logger.debug(
             "Starting restore",
             database=archive.database_name,
@@ -149,6 +149,8 @@ class RestoreEngine:
                     report=report,
                 )
 
+        records_failed_count = 0
+
         # Transform records if schema migration is needed
         if archived_schema and current_schema and schema_migration_strategy != "none":
             transformed_records = []
@@ -176,7 +178,7 @@ class RestoreEngine:
                             "Record transformation failed, skipping",
                             error=str(e),
                         )
-                        stats["records_failed"] += 1
+                        records_failed_count += 1
                         continue
             records = transformed_records
 
@@ -259,17 +261,17 @@ class RestoreEngine:
         if conflict_report and conflict_report.has_conflicts and conflict_strategy == "skip":
             # Records were filtered, so skipped = original - filtered
             records_skipped_count = original_record_count - len(records)
-        
+
         # Safely extract conflict types
         conflict_types_dict = {}
         if conflict_report and hasattr(conflict_report, 'conflict_types'):
             conflict_types_dict = conflict_report.conflict_types or {}
-        
+
         stats = {
             "records_processed": original_record_count,  # Use original count, not filtered
             "records_restored": 0,
             "records_skipped": records_skipped_count,
-            "records_failed": 0,
+            "records_failed": records_failed_count,
             "conflicts_detected": conflict_report.total_conflicts if conflict_report else 0,
             "conflict_types": conflict_types_dict,
             "skip_reason": "conflict" if conflict_report and conflict_report.has_conflicts and conflict_strategy == "skip" else None,
@@ -748,14 +750,14 @@ class RestoreEngine:
                         # Parse ISO format datetime
                         dt_str = value.replace("Z", "+00:00")
                         dt = datetime.fromisoformat(dt_str)
-                        
+
                         # Check if column is timezone-aware or timezone-naive
                         is_tz_aware = self._is_column_timezone_aware(col, current_schema)
                         if not is_tz_aware and dt.tzinfo is not None:
                             # Column is TIMESTAMP (naive), but datetime is timezone-aware
                             # Convert to naive by removing timezone info (keeping UTC time)
                             dt = dt.replace(tzinfo=None)
-                        
+
                         values.append(dt)
                     except (ValueError, AttributeError):
                         values.append(value)

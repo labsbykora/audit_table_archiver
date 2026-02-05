@@ -2,13 +2,12 @@
 
 import json
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
 import structlog
 
-from archiver.database import DatabaseManager
 from archiver.exceptions import ArchiverError
 from archiver.s3_client import S3Client
 from utils.logging import get_logger

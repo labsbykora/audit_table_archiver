@@ -3,7 +3,6 @@
 import gzip
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Optional
 
 import structlog
@@ -141,10 +140,10 @@ class S3ArchiveReader:
             metadata_bytes = self.s3_client.get_object_bytes(metadata_key)
             metadata = json.loads(metadata_bytes.decode("utf-8"))
             self.logger.debug("Metadata file read", metadata_key=metadata_key)
-        except Exception as e:
+        except Exception:
             # Try alternative metadata key patterns
             alternative_keys = []
-            
+
             # Try with schema name inserted: archives/db/public/table/...
             key_parts = s3_key.split("/")
             if len(key_parts) >= 3:
@@ -155,14 +154,14 @@ class S3ArchiveReader:
                     alt_parts.insert(db_idx + 1, "public")
                     alt_key = "/".join(alt_parts).replace(".jsonl.gz", ".metadata.json")
                     alternative_keys.append(alt_key)
-            
+
             # Try without prefix (in case prefix was added twice)
             if self.s3_config.prefix:
                 prefix = self.s3_config.prefix.rstrip("/")
                 if s3_key.startswith(prefix + "/"):
                     alt_key = s3_key[len(prefix) + 1:].replace(".jsonl.gz", ".metadata.json")
                     alternative_keys.append(alt_key)
-            
+
             # Try each alternative
             for alt_key in alternative_keys:
                 if alt_key and alt_key != metadata_key:
@@ -175,7 +174,7 @@ class S3ArchiveReader:
                         break
                     except Exception:
                         continue
-            
+
             if metadata is None:
                 # Metadata is optional - we'll create minimal metadata after reading the data file
                 self.logger.warning(
@@ -188,21 +187,20 @@ class S3ArchiveReader:
 
         # Read data file
         compressed_data = None
-        actual_s3_key = s3_key
         try:
             compressed_data = self.s3_client.get_object_bytes(s3_key)
             self.logger.debug("Data file read", s3_key=s3_key, size=len(compressed_data))
         except Exception as e:
             # Try alternative paths for data file
             alternative_keys = []
-            
+
             # Try without prefix (in case prefix was added twice during upload)
             if self.s3_config.prefix:
                 prefix = self.s3_config.prefix.rstrip("/")
                 if s3_key.startswith(prefix + "/"):
                     alt_key = s3_key[len(prefix) + 1:]
                     alternative_keys.append(alt_key)
-            
+
             # Try with schema name inserted: archives/db/public/table/...
             key_parts = s3_key.split("/")
             if len(key_parts) >= 3:
@@ -213,7 +211,7 @@ class S3ArchiveReader:
                     alt_parts.insert(db_idx + 1, "public")
                     alt_key = "/".join(alt_parts)
                     alternative_keys.append(alt_key)
-            
+
             # Try each alternative
             for alt_key in alternative_keys:
                 if alt_key != s3_key:
@@ -221,11 +219,10 @@ class S3ArchiveReader:
                         self.logger.debug("Trying alternative data file key", s3_key=alt_key)
                         compressed_data = self.s3_client.get_object_bytes(alt_key)
                         self.logger.debug("Data file found with alternative key", s3_key=alt_key)
-                        actual_s3_key = alt_key  # Update for consistency
                         break
                     except Exception:
                         continue
-            
+
             if compressed_data is None:
                 # Provide helpful error message
                 error_msg = (
@@ -240,7 +237,7 @@ class S3ArchiveReader:
                 # Skip schema if present
                 if table_name == "public" and len(key_parts) > 3:
                     table_name = key_parts[3]
-                
+
                 error_msg += (
                     f"\n\nTo list available archives, use:\n"
                     f"  python -m restore.main --config <config> --database {db_name} --table {table_name}"
@@ -271,7 +268,7 @@ class S3ArchiveReader:
                 first_line = jsonl_data.split(b"\n")[0].decode("utf-8")
                 first_record = json.loads(first_line)
                 record_count = len(jsonl_data.split(b"\n")) - 1  # Subtract 1 for trailing newline
-                
+
                 metadata = {
                     "batch_info": {
                         "database_name": first_record.get("_source_database", "unknown"),
@@ -384,12 +381,12 @@ class S3ArchiveReader:
         # S3 keys are structured as: prefix/database_name/table_name/... (no schema in path)
         # But we should try both patterns for compatibility
         prefixes_to_try = []
-        
+
         if self.s3_config.prefix:
             base_prefix = self.s3_config.prefix.rstrip("/")
         else:
             base_prefix = ""
-        
+
         if database_name and table_name:
             # Try without schema first (actual archiver format)
             prefix_parts = []
@@ -398,7 +395,7 @@ class S3ArchiveReader:
             prefix_parts.append(database_name)
             prefix_parts.append(table_name)
             prefixes_to_try.append("/".join(prefix_parts))
-            
+
             # Also try with schema (for future compatibility or different archiver versions)
             prefix_parts_with_schema = []
             if base_prefix:
@@ -434,7 +431,7 @@ class S3ArchiveReader:
             paginator = self.s3_client.client.get_paginator("list_objects_v2")
             s3_keys = []
             seen_keys = set()  # Avoid duplicates when trying multiple prefixes
-            
+
             for search_prefix in prefixes_to_try:
                 for page in paginator.paginate(Bucket=self.s3_config.bucket, Prefix=search_prefix):
                     if "Contents" in page:
@@ -444,7 +441,7 @@ class S3ArchiveReader:
                             if key in seen_keys:
                                 continue
                             seen_keys.add(key)
-                            
+
                             # Only include .jsonl.gz files (exclude metadata files)
                             if key.endswith(".jsonl.gz"):
                                 # Filter by date if specified

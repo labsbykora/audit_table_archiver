@@ -1,23 +1,15 @@
 """Integration tests for Phase 2 features (checksums, metadata, watermarks, schema)."""
 
-import asyncio
 import json
-import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root / "src"))
-
 import pytest
-from archiver.archiver import Archiver
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig
+
 from archiver.checkpoint import CheckpointManager
-from archiver.watermark_manager import WatermarkManager
-from archiver.schema_detector import SchemaDetector
 from archiver.database import DatabaseManager
-from archiver.s3_client import S3Client
+from archiver.schema_detector import SchemaDetector
+from archiver.watermark_manager import WatermarkManager
 
 
 @pytest.mark.asyncio
@@ -158,6 +150,7 @@ async def test_checkpoint_with_watermark(s3_client, db_config, test_table):
 async def test_metadata_file_upload(s3_client, s3_config, test_table):
     """Test that metadata files are uploaded correctly."""
     import tempfile
+
     from archiver.metadata import MetadataGenerator
 
     metadata_generator = MetadataGenerator()
@@ -207,6 +200,7 @@ async def test_metadata_file_upload(s3_client, s3_config, test_table):
 async def test_deletion_manifest_upload(s3_client, s3_config, test_table):
     """Test that deletion manifests are uploaded correctly."""
     import tempfile
+
     from archiver.deletion_manifest import DeletionManifestGenerator
 
     manifest_generator = DeletionManifestGenerator()

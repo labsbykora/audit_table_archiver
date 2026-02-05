@@ -42,6 +42,7 @@ async def test_serialization_performance() -> None:
         for row in test_records
     ]
     jsonl_data = serializer.to_jsonl(serialized)
+    assert jsonl_data
     elapsed = time.time() - start
 
     # Should serialize 1000 records in <1 second
@@ -78,6 +79,7 @@ async def test_batch_selection_performance(
 ) -> None:
     """Test batch selection performance."""
     import os
+
     from archiver.config import DatabaseConfig, TableConfig
     from archiver.database import DatabaseManager
 

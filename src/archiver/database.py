@@ -1,8 +1,8 @@
 """Database connection and query management using asyncpg."""
 
-import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, Optional
 
 import asyncpg
 from structlog import BoundLogger

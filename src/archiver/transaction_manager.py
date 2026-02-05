@@ -1,9 +1,10 @@
 """Transaction management for safe batch processing."""
 
 import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
-from typing import Any, AsyncGenerator, Optional
+from datetime import datetime
+from typing import Optional
 
 import asyncpg
 import structlog
@@ -82,7 +83,7 @@ class TransactionManager:
             raise TransactionError(
                 f"Transaction timeout after {self.timeout_seconds} seconds",
                 context={"timeout_seconds": self.timeout_seconds},
-            )
+            ) from None
         finally:
             self._transaction_start = None
             self._savepoint_count = 0

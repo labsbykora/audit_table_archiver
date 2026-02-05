@@ -1,15 +1,9 @@
 """Integration tests for S3 operations."""
 
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
-
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 # Fixtures are auto-discovered from conftest.py by pytest
 

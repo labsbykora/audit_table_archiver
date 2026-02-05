@@ -98,10 +98,10 @@ class BatchProcessor:
             Cutoff datetime (timezone-aware if column is TIMESTAMPTZ, naive if TIMESTAMP)
         """
         cutoff = self.calculate_cutoff_date(safety_buffer_days)
-        
+
         # Check if column is timezone-aware
         is_tz_aware = await self._is_timestamp_column_timezone_aware()
-        
+
         if is_tz_aware:
             # Column is TIMESTAMPTZ, keep timezone-aware
             return cutoff

@@ -106,20 +106,20 @@ class S3Config(BaseModel):
 
     def get_credentials(self) -> Optional[dict[str, str]]:
         """Get AWS credentials from config file or environment variables.
-        
+
         Returns:
             Dictionary with 'aws_access_key_id' and 'aws_secret_access_key', or None
             if credentials should be obtained from standard AWS locations (IAM role, etc.)
-            
+
         Raises:
             ValueError: If credentials are partially specified
         """
         config_has_key = self.aws_access_key_id is not None
         config_has_secret = self.aws_secret_access_key is not None
-        
+
         env_key = os.getenv("AWS_ACCESS_KEY_ID")
         env_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
-        
+
         # If both are in config file, use them (with warning)
         if config_has_key and config_has_secret:
             import warnings
@@ -134,21 +134,21 @@ class S3Config(BaseModel):
                 "aws_access_key_id": self.aws_access_key_id,
                 "aws_secret_access_key": self.aws_secret_access_key,
             }
-        
+
         # If one is in config but not the other, error
         if config_has_key or config_has_secret:
             raise ValueError(
                 "Both aws_access_key_id and aws_secret_access_key must be provided together, "
                 "or use environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)"
             )
-        
+
         # If both are in environment variables, use them
         if env_key and env_secret:
             return {
                 "aws_access_key_id": env_key,
                 "aws_secret_access_key": env_secret,
             }
-        
+
         # If neither, return None to let boto3 use default credential chain (IAM role, etc.)
         return None
 
@@ -223,10 +223,10 @@ class DatabaseConfig(BaseModel):
 
     def get_password(self) -> str:
         """Get password from environment variable or config file.
-        
+
         Returns:
             Database password
-            
+
         Raises:
             ValueError: If password cannot be retrieved
         """
@@ -574,7 +574,7 @@ def load_config(config_path: Path) -> ArchiverConfig:
         ConfigurationError: If configuration is invalid
     """
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             raw_config = yaml.safe_load(f)
 
         if not raw_config:
@@ -589,9 +589,9 @@ def load_config(config_path: Path) -> ArchiverConfig:
         return config
 
     except FileNotFoundError:
-        raise ValueError(f"Configuration file not found: {config_path}")
+        raise ValueError(f"Configuration file not found: {config_path}") from None
     except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in configuration file: {e}")
+        raise ValueError(f"Invalid YAML in configuration file: {e}") from e
     except Exception as e:
         raise ValueError(f"Configuration validation failed: {e}") from e
 

@@ -2,13 +2,12 @@
 
 import json
 import shutil
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 import structlog
 
-from archiver.exceptions import S3Error
 from utils.logging import get_logger
 
 
@@ -122,7 +121,7 @@ class LocalFallback:
 
             if metadata_file.exists():
                 try:
-                    with open(metadata_file, "r") as f:
+                    with open(metadata_file) as f:
                         metadata_data = json.load(f)
                 except (json.JSONDecodeError, FileNotFoundError):
                     pass

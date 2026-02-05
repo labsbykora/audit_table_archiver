@@ -2,7 +2,6 @@
 
 import json
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 import aiohttp
@@ -91,8 +90,8 @@ class EmailNotificationChannel(NotificationChannel):
 
         try:
             import smtplib
-            from email.mime.text import MIMEText
             from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
 
             # Create email message
             msg = MIMEMultipart()

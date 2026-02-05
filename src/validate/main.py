@@ -7,9 +7,8 @@ from pathlib import Path
 from typing import Optional
 
 import click
-import structlog
 
-from archiver.config import ArchiverConfig, load_config
+from archiver.config import load_config
 from archiver.exceptions import ConfigurationError
 from validate.archive_validator import ArchiveValidator
 
@@ -18,7 +17,7 @@ src_path = Path(__file__).parent.parent.parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from utils.logging import configure_logging, get_logger
+from utils.logging import configure_logging, get_logger  # noqa: E402
 
 
 @click.command()
@@ -151,18 +150,18 @@ def main(
 
                 click.echo(json.dumps(result_dict, indent=2))
             else:
-                from utils.output import print_header, print_success, print_error, print_key_value
-                
+                from utils.output import print_error, print_header, print_key_value, print_success
+
                 print_header("Archive Validation", color="cyan" if result_dict["valid"] else "red")
                 print_key_value("S3 Key", s3_key)
-                print_key_value("Status", "Valid" if result_dict["valid"] else "Invalid", 
+                print_key_value("Status", "Valid" if result_dict["valid"] else "Invalid",
                               value_color="green" if result_dict["valid"] else "red")
-                
+
                 if result_dict.get("record_count"):
                     print_key_value("Record Count", f"{result_dict['record_count']:,}")
                 if result_dict.get("checksum"):
                     print_key_value("Checksum", result_dict["checksum"][:16] + "...")
-                
+
                 if not result_dict["valid"]:
                     click.echo()
                     print_error("Validation Errors:")
@@ -192,38 +191,44 @@ def main(
 
                 click.echo(json.dumps(result.to_dict(), indent=2))
             else:
-                from utils.output import print_header, print_section, print_key_value, print_success, print_error, print_table
-                
+                from utils.output import (
+                    print_error,
+                    print_header,
+                    print_key_value,
+                    print_section,
+                    print_success,
+                )
+
                 # Format validation results nicely
-                print_header("Archive Validation Results", 
+                print_header("Archive Validation Results",
                            color="green" if result.is_valid else "red")
-                
+
                 print_section("Overview")
                 print_key_value("Total Archives", result.total_archives)
                 print_key_value("Valid", result.valid_archives, value_color="green")
                 print_key_value("Invalid", result.invalid_archives, value_color="red")
-                
+
                 if result.orphaned_files:
                     print_section("Orphaned Files", color="yellow")
                     for file in result.orphaned_files[:10]:  # Show first 10
                         click.echo(f"  • {file}")
                     if len(result.orphaned_files) > 10:
                         click.echo(f"  ... and {len(result.orphaned_files) - 10} more")
-                
+
                 if result.checksum_failures:
                     print_section("Checksum Failures", color="red")
                     for file in result.checksum_failures[:10]:
                         click.echo(f"  • {file}")
                     if len(result.checksum_failures) > 10:
                         click.echo(f"  ... and {len(result.checksum_failures) - 10} more")
-                
+
                 if result.record_count_mismatches:
                     print_section("Record Count Mismatches", color="red")
                     for file in result.record_count_mismatches[:10]:
                         click.echo(f"  • {file}")
                     if len(result.record_count_mismatches) > 10:
                         click.echo(f"  ... and {len(result.record_count_mismatches) - 10} more")
-                
+
                 click.echo()
                 if result.is_valid:
                     print_success("All archives validated successfully")

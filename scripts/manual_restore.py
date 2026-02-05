@@ -39,23 +39,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 def deserialize_value(value: Any, column_name: str) -> Any:
     """Deserialize a value from JSON back to Python type for PostgreSQL.
-    
+
     This reverses the serialization done by the archiver.
-    
+
     Args:
         value: Value from JSON
         column_name: Column name (for context)
-        
+
     Returns:
         Deserialized value ready for PostgreSQL
     """
     if value is None:
         return None
-    
+
     # If it's already a Python type, return as-is
     if isinstance(value, (int, float, bool)):
         return value
-    
+
     # Handle strings that need conversion
     if isinstance(value, str):
         # Try to parse as datetime (ISO 8601 format)
@@ -66,39 +66,39 @@ def deserialize_value(value: Any, column_name: str) -> Any:
                 return datetime.fromisoformat(dt_str)
             except (ValueError, AttributeError):
                 pass
-        
+
         # Try to parse as UUID
         if column_name.endswith("_id") or "uuid" in column_name.lower():
             try:
                 return UUID(value)
             except (ValueError, AttributeError):
                 pass
-        
+
         # Try to parse as Decimal (for numeric/decimal columns)
         if column_name in ["amount", "price", "balance"] or "decimal" in column_name.lower():
             try:
                 return Decimal(value)
             except (ValueError, AttributeError):
                 pass
-        
+
         # Try to decode as base64 (BYTEA fields)
         if column_name.endswith("_data") or "bytea" in column_name.lower():
             try:
                 return base64.b64decode(value)
             except (ValueError, Exception):
                 pass
-        
+
         # Return string as-is
         return value
-    
+
     # Handle lists (arrays)
     if isinstance(value, list):
         return [deserialize_value(item, column_name) for item in value]
-    
+
     # Handle dicts (JSONB)
     if isinstance(value, dict):
         return {k: deserialize_value(v, k) for k, v in value.items()}
-    
+
     # Fallback: return as-is
     return value
 

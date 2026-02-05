@@ -1,18 +1,10 @@
 """Integration tests for Phase 4: Configuration wizard."""
 
-import asyncio
 import os
-import sys
-from pathlib import Path
 
 import pytest
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config
+from archiver.config import ArchiverConfig
 from wizard.config_wizard import ConfigWizard
 
 
@@ -23,9 +15,9 @@ async def test_wizard_detect_tables_integration(
 ):
     """Test wizard table detection with real database."""
     os.environ["TEST_DB_PASSWORD"] = "archiver_password"
-    
+
     wizard = ConfigWizard()
-    
+
     # Test table detection
     tables = await wizard.detect_tables(
         host="localhost",
@@ -35,10 +27,10 @@ async def test_wizard_detect_tables_integration(
         password="archiver_password",
         schema="public",
     )
-    
+
     # Should detect at least one table (the test table created by fixture)
     assert len(tables) > 0
-    
+
     # Verify table structure
     table = tables[0]
     assert "name" in table
@@ -56,11 +48,11 @@ async def test_wizard_estimate_record_count_integration(
 ):
     """Test wizard record count estimation with real database."""
     # test_data is already inserted by fixture, no need to insert again
-    
+
     os.environ["TEST_DB_PASSWORD"] = "archiver_password"
-    
+
     wizard = ConfigWizard()
-    
+
     # Estimate record count
     estimates = await wizard.estimate_record_count(
         host="localhost",
@@ -73,7 +65,7 @@ async def test_wizard_estimate_record_count_integration(
         timestamp_column="created_at",
         retention_days=90,
     )
-    
+
     assert "total_records" in estimates
     assert estimates["total_records"] >= len(test_data)
     assert "eligible_records" in estimates
@@ -84,7 +76,7 @@ async def test_wizard_estimate_record_count_integration(
 def test_wizard_generate_config():
     """Test wizard configuration generation."""
     wizard = ConfigWizard()
-    
+
     databases = [
         {
             "name": "test_db",
@@ -103,20 +95,20 @@ def test_wizard_generate_config():
             ],
         }
     ]
-    
+
     s3_config = {
         "bucket": "test-bucket",
         "region": "us-east-1",
         "prefix": "archives/",
     }
-    
+
     defaults = {
         "retention_days": 90,
         "batch_size": 1000,
     }
-    
+
     config = wizard.generate_config(databases, s3_config, defaults)
-    
+
     assert isinstance(config, ArchiverConfig)
     assert len(config.databases) == 1
     assert config.databases[0].name == "test_db"
@@ -128,16 +120,16 @@ def test_wizard_generate_config():
 def test_wizard_suggest_batch_size():
     """Test batch size suggestions."""
     wizard = ConfigWizard()
-    
+
     # Small dataset
     assert wizard.suggest_batch_size(500) == 100
-    
+
     # Medium dataset
     assert wizard.suggest_batch_size(5000) == 500
-    
+
     # Large dataset
     assert wizard.suggest_batch_size(50000) == 1000
-    
+
     # Very large dataset
     assert wizard.suggest_batch_size(1000000) == 10000
 

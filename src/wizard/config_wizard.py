@@ -1,6 +1,5 @@
 """Interactive configuration wizard for archiver setup."""
 
-import asyncio
 from typing import Any, Optional
 
 import asyncpg

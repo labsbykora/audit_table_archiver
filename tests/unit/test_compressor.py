@@ -1,6 +1,5 @@
 """Unit tests for compressor module."""
 
-import gzip
 
 import pytest
 

@@ -1,12 +1,11 @@
 """Unit tests for enhanced notification manager."""
 
-import os
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from archiver.config import EmailConfig, NotificationConfig, SlackConfig, TeamsConfig
+from archiver.config import EmailConfig, NotificationConfig
 from archiver.notification_manager import (
     DigestCollector,
     EnhancedNotificationManager,

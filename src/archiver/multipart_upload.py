@@ -84,7 +84,7 @@ class MultipartUploadState:
         if not state_file.exists():
             return None
         try:
-            with open(state_file, "r") as f:
+            with open(state_file) as f:
                 data = json.load(f)
             return cls.from_dict(data, state_file=state_file)
         except (json.JSONDecodeError, KeyError, FileNotFoundError):

@@ -1,13 +1,11 @@
 """Unit tests for restore CLI entry point."""
 
-import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig
 from restore.main import main
 
 
@@ -53,7 +51,7 @@ def test_restore_main_missing_config(runner: CliRunner) -> None:
     """Test restore with missing config."""
     # Click requires --config, so this will fail at Click level
     result = runner.invoke(main, ["--s3-key", "test/key.jsonl.gz"])
-    
+
     # Click will show error about missing required option
     assert result.exit_code != 0
 
@@ -61,7 +59,7 @@ def test_restore_main_missing_config(runner: CliRunner) -> None:
 def test_restore_main_missing_s3_key(runner: CliRunner, mock_config_file: Path) -> None:
     """Test restore with missing S3 key."""
     result = runner.invoke(main, ["--config", str(mock_config_file)])
-    
+
     # Should exit with error code (JSON logging may not show in output)
     assert result.exit_code == 1
 
@@ -71,25 +69,25 @@ def test_restore_main_success(runner: CliRunner, mock_config_file: Path) -> None
     with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
          patch("restore.main.DatabaseManager") as mock_db_class, \
          patch("restore.main.RestoreEngine") as mock_engine_class:
-        
+
         # Mock archive file
         mock_archive = MagicMock()
         mock_archive.record_count = 100
         mock_archive.database_name = "test_db"
         mock_archive.table_name = "audit_logs"
         mock_archive.parse_records.return_value = [{"id": 1, "data": "test"}]
-        
+
         # Mock S3 reader
         mock_reader = MagicMock()
         mock_reader.read_archive = AsyncMock(return_value=mock_archive)
         mock_reader_class.return_value = mock_reader
-        
+
         # Mock database manager
         mock_db = MagicMock()
         mock_db.connect = AsyncMock()
         mock_db.disconnect = AsyncMock()
         mock_db_class.return_value = mock_db
-        
+
         # Mock restore engine
         mock_engine = MagicMock()
         mock_engine.restore_archive = AsyncMock(return_value={
@@ -98,7 +96,7 @@ def test_restore_main_success(runner: CliRunner, mock_config_file: Path) -> None
             "records_failed": 0,
         })
         mock_engine_class.return_value = mock_engine
-        
+
         result = runner.invoke(
             main,
             [
@@ -108,7 +106,7 @@ def test_restore_main_success(runner: CliRunner, mock_config_file: Path) -> None
                 "archives/test_db/public/audit_logs/year=2026/month=01/day=04/file.jsonl.gz",
             ],
         )
-        
+
         assert result.exit_code == 0
         mock_reader.read_archive.assert_called_once()
         mock_engine.restore_archive.assert_called_once()
@@ -122,11 +120,11 @@ def test_restore_main_dry_run(runner: CliRunner, mock_config_file: Path) -> None
         mock_archive.database_name = "test_db"
         mock_archive.table_name = "audit_logs"
         mock_archive.parse_records.return_value = [{"id": 1, "data": "test"}]
-        
+
         mock_reader = MagicMock()
         mock_reader.read_archive = AsyncMock(return_value=mock_archive)
         mock_reader_class.return_value = mock_reader
-        
+
         result = runner.invoke(
             main,
             [
@@ -137,7 +135,7 @@ def test_restore_main_dry_run(runner: CliRunner, mock_config_file: Path) -> None
                 "--dry-run",
             ],
         )
-        
+
         assert result.exit_code == 0
         mock_reader.read_archive.assert_called_once()
 
@@ -147,25 +145,25 @@ def test_restore_main_with_conflict_strategy(runner: CliRunner, mock_config_file
     with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
          patch("restore.main.DatabaseManager") as mock_db_class, \
          patch("restore.main.RestoreEngine") as mock_engine_class:
-        
+
         mock_archive = MagicMock()
         mock_archive.record_count = 100
         mock_archive.database_name = "test_db"
         mock_archive.table_name = "audit_logs"
-        
+
         mock_reader = MagicMock()
         mock_reader.read_archive = AsyncMock(return_value=mock_archive)
         mock_reader_class.return_value = mock_reader
-        
+
         mock_db = MagicMock()
         mock_db.connect = AsyncMock()
         mock_db.disconnect = AsyncMock()
         mock_db_class.return_value = mock_db
-        
+
         mock_engine = MagicMock()
         mock_engine.restore_archive = AsyncMock(return_value={"records_restored": 100})
         mock_engine_class.return_value = mock_engine
-        
+
         result = runner.invoke(
             main,
             [
@@ -177,7 +175,7 @@ def test_restore_main_with_conflict_strategy(runner: CliRunner, mock_config_file
                 "overwrite",
             ],
         )
-        
+
         assert result.exit_code == 0
         call_args = mock_engine.restore_archive.call_args
         assert call_args[1]["conflict_strategy"] == "overwrite"
@@ -188,25 +186,25 @@ def test_restore_main_with_schema_migration(runner: CliRunner, mock_config_file:
     with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
          patch("restore.main.DatabaseManager") as mock_db_class, \
          patch("restore.main.RestoreEngine") as mock_engine_class:
-        
+
         mock_archive = MagicMock()
         mock_archive.record_count = 100
         mock_archive.database_name = "test_db"
         mock_archive.table_name = "audit_logs"
-        
+
         mock_reader = MagicMock()
         mock_reader.read_archive = AsyncMock(return_value=mock_archive)
         mock_reader_class.return_value = mock_reader
-        
+
         mock_db = MagicMock()
         mock_db.connect = AsyncMock()
         mock_db.disconnect = AsyncMock()
         mock_db_class.return_value = mock_db
-        
+
         mock_engine = MagicMock()
         mock_engine.restore_archive = AsyncMock(return_value={"records_restored": 100})
         mock_engine_class.return_value = mock_engine
-        
+
         result = runner.invoke(
             main,
             [
@@ -218,7 +216,7 @@ def test_restore_main_with_schema_migration(runner: CliRunner, mock_config_file:
                 "transform",
             ],
         )
-        
+
         assert result.exit_code == 0
         call_args = mock_engine.restore_archive.call_args
         assert call_args[1]["schema_migration_strategy"] == "transform"
@@ -231,11 +229,11 @@ def test_restore_main_database_not_found(runner: CliRunner, mock_config_file: Pa
         mock_archive.record_count = 100
         mock_archive.database_name = "nonexistent_db"
         mock_archive.table_name = "audit_logs"
-        
+
         mock_reader = MagicMock()
         mock_reader.read_archive = AsyncMock(return_value=mock_archive)
         mock_reader_class.return_value = mock_reader
-        
+
         result = runner.invoke(
             main,
             [
@@ -245,7 +243,7 @@ def test_restore_main_database_not_found(runner: CliRunner, mock_config_file: Pa
                 "archives/nonexistent_db/public/audit_logs/year=2026/month=01/day=04/file.jsonl.gz",
             ],
         )
-        
+
         # Should exit with error code (JSON logging may not show in output)
         assert result.exit_code == 1
 
@@ -255,25 +253,25 @@ def test_restore_main_extract_db_table_from_key(runner: CliRunner, mock_config_f
     with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
          patch("restore.main.DatabaseManager") as mock_db_class, \
          patch("restore.main.RestoreEngine") as mock_engine_class:
-        
+
         mock_archive = MagicMock()
         mock_archive.record_count = 100
         mock_archive.database_name = "test_db"
         mock_archive.table_name = "audit_logs"
-        
+
         mock_reader = MagicMock()
         mock_reader.read_archive = AsyncMock(return_value=mock_archive)
         mock_reader_class.return_value = mock_reader
-        
+
         mock_db = MagicMock()
         mock_db.connect = AsyncMock()
         mock_db.disconnect = AsyncMock()
         mock_db_class.return_value = mock_db
-        
+
         mock_engine = MagicMock()
         mock_engine.restore_archive = AsyncMock(return_value={"records_restored": 100})
         mock_engine_class.return_value = mock_engine
-        
+
         result = runner.invoke(
             main,
             [
@@ -283,7 +281,7 @@ def test_restore_main_extract_db_table_from_key(runner: CliRunner, mock_config_f
                 "archives/test_db/public/audit_logs/year=2026/month=01/day=04/file.jsonl.gz",
             ],
         )
-        
+
         assert result.exit_code == 0
 
 
@@ -292,25 +290,25 @@ def test_restore_main_with_options(runner: CliRunner, mock_config_file: Path) ->
     with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
          patch("restore.main.DatabaseManager") as mock_db_class, \
          patch("restore.main.RestoreEngine") as mock_engine_class:
-        
+
         mock_archive = MagicMock()
         mock_archive.record_count = 100
         mock_archive.database_name = "test_db"
         mock_archive.table_name = "audit_logs"
-        
+
         mock_reader = MagicMock()
         mock_reader.read_archive = AsyncMock(return_value=mock_archive)
         mock_reader_class.return_value = mock_reader
-        
+
         mock_db = MagicMock()
         mock_db.connect = AsyncMock()
         mock_db.disconnect = AsyncMock()
         mock_db_class.return_value = mock_db
-        
+
         mock_engine = MagicMock()
         mock_engine.restore_archive = AsyncMock(return_value={"records_restored": 100})
         mock_engine_class.return_value = mock_engine
-        
+
         result = runner.invoke(
             main,
             [
@@ -333,7 +331,7 @@ def test_restore_main_with_options(runner: CliRunner, mock_config_file: Path) ->
                 "--no-detect-conflicts",
             ],
         )
-        
+
         assert result.exit_code == 0
         call_args = mock_engine.restore_archive.call_args
         assert call_args[1]["batch_size"] == 5000

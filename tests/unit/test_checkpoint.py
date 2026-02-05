@@ -1,10 +1,9 @@
 """Unit tests for checkpoint module."""
 
 import json
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -52,7 +51,7 @@ def test_checkpoint_init(checkpoint: Checkpoint) -> None:
 def test_checkpoint_to_dict(checkpoint: Checkpoint) -> None:
     """Test checkpoint to dictionary conversion."""
     data = checkpoint.to_dict()
-    
+
     assert data["version"] == "1.0"
     assert data["database"] == "test_db"
     assert data["table"] == "test_table"
@@ -80,9 +79,9 @@ def test_checkpoint_from_dict() -> None:
         "checkpoint_time": "2024-01-01T00:00:00+00:00",
         "batch_id": "batch_123",
     }
-    
+
     checkpoint = Checkpoint.from_dict(data)
-    
+
     assert checkpoint.database_name == "test_db"
     assert checkpoint.table_name == "test_table"
     assert checkpoint.batch_number == 5
@@ -93,7 +92,7 @@ def test_checkpoint_from_dict() -> None:
 def test_checkpoint_from_dict_invalid() -> None:
     """Test checkpoint from dictionary with invalid data."""
     data = {"invalid": "data"}
-    
+
     with pytest.raises(CheckpointError, match="Invalid checkpoint data"):
         Checkpoint.from_dict(data)
 
@@ -104,7 +103,7 @@ def test_checkpoint_manager_init() -> None:
         storage_type="s3",
         checkpoint_interval=10,
     )
-    
+
     assert manager.storage_type == "s3"
     assert manager.checkpoint_interval == 10
 
@@ -137,14 +136,14 @@ def test_checkpoint_manager_should_save_checkpoint(checkpoint_manager: Checkpoin
 async def test_checkpoint_manager_save_to_s3(checkpoint: Checkpoint) -> None:
     """Test saving checkpoint to S3."""
     manager = CheckpointManager(storage_type="s3", checkpoint_interval=10)
-    
+
     mock_s3_client = MagicMock()
     # upload_file is not async in S3Client, it's a regular method
     mock_s3_client.upload_file = MagicMock()
     mock_s3_client.config.prefix = "archives/"
-    
+
     await manager.save_checkpoint(checkpoint, s3_client=mock_s3_client)
-    
+
     mock_s3_client.upload_file.assert_called_once()
     call_args = mock_s3_client.upload_file.call_args
     assert ".checkpoint.json" in str(call_args[0][1])
@@ -155,7 +154,7 @@ async def test_checkpoint_manager_load_from_s3(checkpoint_manager: CheckpointMan
     """Test loading checkpoint from S3."""
     mock_s3_client = MagicMock()
     mock_s3_client.config.prefix = "archives/"
-    
+
     checkpoint_data = {
         "version": "1.0",
         "database": "test_db",
@@ -169,12 +168,12 @@ async def test_checkpoint_manager_load_from_s3(checkpoint_manager: CheckpointMan
         "checkpoint_time": "2024-01-01T00:00:00+00:00",
         "batch_id": "batch_123",
     }
-    
+
     checkpoint_json = json.dumps(checkpoint_data)
     mock_s3_client.get_object_bytes = MagicMock(return_value=checkpoint_json.encode("utf-8"))
-    
+
     checkpoint = await checkpoint_manager.load_checkpoint("test_db", "test_table", s3_client=mock_s3_client)
-    
+
     assert checkpoint is not None
     assert checkpoint.database_name == "test_db"
     assert checkpoint.batch_number == 5
@@ -186,9 +185,9 @@ async def test_checkpoint_manager_load_from_s3_not_found(checkpoint_manager: Che
     mock_s3_client = MagicMock()
     mock_s3_client.config.prefix = "archives/"
     mock_s3_client.get_object_bytes = MagicMock(side_effect=S3Error("Not found"))
-    
+
     checkpoint = await checkpoint_manager.load_checkpoint("test_db", "test_table", s3_client=mock_s3_client)
-    
+
     assert checkpoint is None
 
 
@@ -199,9 +198,9 @@ async def test_checkpoint_manager_delete_from_s3(checkpoint_manager: CheckpointM
     mock_s3_client.config.prefix = "archives/"
     mock_s3_client.client = MagicMock()
     mock_s3_client.client.delete_object = MagicMock()
-    
+
     await checkpoint_manager.delete_checkpoint("test_db", "test_table", s3_client=mock_s3_client)
-    
+
     # Should attempt to delete checkpoint
     mock_s3_client.client.delete_object.assert_called_once()
 
@@ -214,13 +213,13 @@ async def test_checkpoint_manager_save_to_local(checkpoint: Checkpoint, tmp_path
         storage_type="local",
         checkpoint_interval=10,
     )
-    
+
     await manager.save_checkpoint(checkpoint, local_path=local_path)
-    
+
     # Local checkpoint files use format: {database}_{table}.checkpoint.json
     checkpoint_file = local_path / "test_db_test_table.checkpoint.json"
     assert checkpoint_file.exists()
-    
+
     data = json.loads(checkpoint_file.read_text())
     assert data["database"] == "test_db"
     assert data["table"] == "test_table"
@@ -234,7 +233,7 @@ async def test_checkpoint_manager_load_from_local(tmp_path: Path) -> None:
         storage_type="local",
         checkpoint_interval=10,
     )
-    
+
     checkpoint_data = {
         "version": "1.0",
         "database": "test_db",
@@ -248,14 +247,14 @@ async def test_checkpoint_manager_load_from_local(tmp_path: Path) -> None:
         "checkpoint_time": "2024-01-01T00:00:00+00:00",
         "batch_id": "batch_123",
     }
-    
+
     # Local checkpoint files use format: {database}_{table}.checkpoint.json
     checkpoint_file = local_path / "test_db_test_table.checkpoint.json"
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     checkpoint_file.write_text(json.dumps(checkpoint_data))
-    
+
     checkpoint = await manager.load_checkpoint("test_db", "test_table", local_path=local_path)
-    
+
     assert checkpoint is not None
     assert checkpoint.database_name == "test_db"
     assert checkpoint.batch_number == 5
@@ -269,9 +268,9 @@ async def test_checkpoint_manager_load_from_local_not_found(tmp_path: Path) -> N
         storage_type="local",
         checkpoint_interval=10,
     )
-    
+
     checkpoint = await manager.load_checkpoint("test_db", "test_table", local_path=local_path)
-    
+
     assert checkpoint is None
 
 
@@ -283,13 +282,13 @@ async def test_checkpoint_manager_delete_from_local(tmp_path: Path) -> None:
         storage_type="local",
         checkpoint_interval=10,
     )
-    
+
     # Local checkpoint files use format: {database}_{table}.checkpoint.json
     checkpoint_file = local_path / "test_db_test_table.checkpoint.json"
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     checkpoint_file.write_text('{"test": "data"}')
-    
+
     await manager.delete_checkpoint("test_db", "test_table", local_path=local_path)
-    
+
     assert not checkpoint_file.exists()
 

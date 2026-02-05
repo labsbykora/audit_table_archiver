@@ -76,7 +76,7 @@ class ValidationResult:
         lines = [f"Archive Validation Report: {self.total_archives} archive(s) checked"]
         lines.append("=" * 70)
 
-        lines.append(f"\nSummary:")
+        lines.append("\nSummary:")
         lines.append(f"  Valid: {self.valid_archives}")
         lines.append(f"  Invalid: {self.invalid_archives}")
         lines.append(f"  Overall Status: {'✓ VALID' if self.is_valid else '✗ INVALID'}")
@@ -213,9 +213,9 @@ class ArchiveValidator:
                         result["valid"] = False
                         result["errors"].append(f"Missing metadata field: {field}")
 
-        self.logger.debug(
-            "Archive validation completed",
-            s3_key=s3_key,
+            self.logger.debug(
+                "Archive validation completed",
+                s3_key=s3_key,
                 valid=result["valid"],
                 errors=len(result["errors"]),
             )

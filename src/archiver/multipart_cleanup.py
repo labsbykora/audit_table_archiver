@@ -1,12 +1,11 @@
 """Cleanup of orphaned multipart uploads in S3."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
 from botocore.exceptions import ClientError
 
-from archiver.config import S3Config
 from archiver.exceptions import S3Error
 from archiver.s3_client import S3Client
 from utils.logging import get_logger

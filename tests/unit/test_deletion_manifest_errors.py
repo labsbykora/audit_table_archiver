@@ -1,7 +1,6 @@
 """Unit tests for deletion manifest error paths."""
 
 import json
-from datetime import datetime, timezone
 
 import pytest
 
@@ -26,7 +25,7 @@ def test_generate_manifest_count_mismatch(generator: DeletionManifestGenerator) 
         primary_keys=[1, 2, 3],
         deleted_count=2,  # Mismatch
     )
-    
+
     assert "warning" in manifest["deletion_info"]
     assert manifest["deletion_info"]["expected_count"] == 3
     assert manifest["deletion_info"]["deleted_count"] == 2
@@ -44,7 +43,7 @@ def test_generate_manifest_count_match(generator: DeletionManifestGenerator) -> 
         primary_keys=[1, 2, 3],
         deleted_count=3,
     )
-    
+
     assert "warning" not in manifest["deletion_info"]
 
 
@@ -55,9 +54,9 @@ def test_manifest_to_json(generator: DeletionManifestGenerator) -> None:
         "manifest_info": {"database": "db1"},
         "primary_keys": [1, 2, 3],
     }
-    
+
     json_str = generator.manifest_to_json(manifest)
-    
+
     assert isinstance(json_str, str)
     parsed = json.loads(json_str)
     assert parsed["version"] == "1.0"
@@ -71,9 +70,9 @@ def test_manifest_from_json_valid(generator: DeletionManifestGenerator) -> None:
         "primary_keys": [1, 2, 3],
     }
     json_str = json.dumps(manifest_dict)
-    
+
     result = generator.manifest_from_json(json_str)
-    
+
     assert result["version"] == "1.0"
     assert result["primary_keys"] == [1, 2, 3]
 
@@ -81,7 +80,7 @@ def test_manifest_from_json_valid(generator: DeletionManifestGenerator) -> None:
 def test_manifest_from_json_invalid(generator: DeletionManifestGenerator) -> None:
     """Test manifest_from_json with invalid JSON."""
     invalid_json = "{ invalid json }"
-    
+
     with pytest.raises(ValueError, match="Invalid manifest JSON"):
         generator.manifest_from_json(invalid_json)
 
@@ -92,7 +91,7 @@ def test_verify_manifest_match(generator: DeletionManifestGenerator) -> None:
         "primary_keys": [1, 2, 3, 4, 5],
     }
     expected = [1, 2, 3, 4, 5]
-    
+
     result = generator.verify_manifest(manifest, expected)
     assert result is True
 
@@ -103,7 +102,7 @@ def test_verify_manifest_mismatch(generator: DeletionManifestGenerator) -> None:
         "primary_keys": [1, 2, 3],
     }
     expected = [1, 2, 3, 4, 5]  # Missing 4, 5
-    
+
     result = generator.verify_manifest(manifest, expected)
     assert result is False
 
@@ -114,7 +113,7 @@ def test_verify_manifest_extra_keys(generator: DeletionManifestGenerator) -> Non
         "primary_keys": [1, 2, 3, 4, 5],
     }
     expected = [1, 2, 3]  # Manifest has extra keys
-    
+
     result = generator.verify_manifest(manifest, expected)
     assert result is False
 
@@ -123,7 +122,7 @@ def test_verify_manifest_empty(generator: DeletionManifestGenerator) -> None:
     """Test verify_manifest with empty lists."""
     manifest = {"primary_keys": []}
     expected = []
-    
+
     result = generator.verify_manifest(manifest, expected)
     assert result is True
 
@@ -132,7 +131,7 @@ def test_verify_manifest_missing_key(generator: DeletionManifestGenerator) -> No
     """Test verify_manifest when manifest is missing primary_keys."""
     manifest = {}  # Missing primary_keys
     expected = [1, 2, 3]
-    
+
     result = generator.verify_manifest(manifest, expected)
     assert result is False
 

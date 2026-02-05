@@ -1,15 +1,9 @@
 """Integration tests for distributed locking."""
 
 import asyncio
-import sys
-from pathlib import Path
-
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root / "src"))
 
 import pytest
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig
+
 from archiver.database import DatabaseManager
 from archiver.exceptions import LockError
 from archiver.locking import LockManager
@@ -183,7 +177,7 @@ async def test_stale_file_lock_cleanup(tmp_path):
     lock_file_path.mkdir()
 
     import json
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
 
     # Create a stale lock file (expired)
     stale_lock_file = lock_file_path / "stale_lock.lock"

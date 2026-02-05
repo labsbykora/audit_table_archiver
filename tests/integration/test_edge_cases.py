@@ -1,20 +1,12 @@
 """Edge case and error scenario tests for Phase 1 MVP."""
 
 import json
-import os
-import sys
-from pathlib import Path
 
 import pytest
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
 from archiver.archiver import Archiver
 from archiver.config import ArchiverConfig
-from archiver.exceptions import DatabaseError, S3Error, VerificationError
+from archiver.exceptions import S3Error, VerificationError
 from archiver.s3_client import S3Client
 
 # Fixtures are auto-discovered from conftest.py by pytest
@@ -70,7 +62,7 @@ async def test_no_eligible_records(
     await db_connection.execute(
         f"""
         INSERT INTO {test_table} (user_id, action, metadata, created_at)
-        VALUES 
+        VALUES
             (1, 'test_action', '{{"key": "value"}}', NOW()),
             (2, 'test_action', '{{"key": "value"}}', NOW() - INTERVAL '1 day')
         """
@@ -99,12 +91,10 @@ async def test_null_values_in_data(
 ) -> None:
     """Test archiver handles NULL values in all column types."""
     # Clean up any existing watermarks/checkpoints for this table
-    from archiver.watermark_manager import WatermarkManager
     from archiver.checkpoint import CheckpointManager
-    
-    watermark_manager = WatermarkManager(storage_type="s3")
+
     checkpoint_manager = CheckpointManager(storage_type="s3")
-    
+
     try:
         await checkpoint_manager.delete_checkpoint(
             database_name=archiver_config.databases[0].name,
@@ -113,12 +103,12 @@ async def test_null_values_in_data(
         )
     except Exception:
         pass  # Ignore if doesn't exist
-    
+
     # Insert records with various NULL values (action is NOT NULL, so can't be NULL)
     await db_connection.execute(
         f"""
         INSERT INTO {test_table} (user_id, action, metadata, created_at)
-        VALUES 
+        VALUES
             (NULL, 'test_action', NULL, NOW() - INTERVAL '100 days'),
             (1, 'test_action', '{{"key": "value"}}'::jsonb, NOW() - INTERVAL '100 days'),
             (2, 'test_action', '{{"key": null}}'::jsonb, NOW() - INTERVAL '100 days')
@@ -211,10 +201,9 @@ async def test_s3_upload_failure_rollback(
 
         # Should raise error or mark database as failed
         try:
-            await archiver.archive()
-            # If it doesn't raise, check that database failed
             stats = await archiver.archive()
-            # Re-run to get stats
+            # If it doesn't raise, check that database failed
+            assert stats["databases_failed"] >= 1
         except S3Error:
             pass  # Expected
 
@@ -285,9 +274,9 @@ async def test_large_batch_handling(
     """Test archiver handles large batches correctly."""
     # Clean up any existing watermarks/checkpoints for this table
     from archiver.checkpoint import CheckpointManager
-    
+
     checkpoint_manager = CheckpointManager(storage_type="s3")
-    
+
     try:
         await checkpoint_manager.delete_checkpoint(
             database_name=archiver_config.databases[0].name,
@@ -296,7 +285,7 @@ async def test_large_batch_handling(
         )
     except Exception:
         pass  # Ignore if doesn't exist
-    
+
     # Insert 1000 records
     await db_connection.executemany(
         f"""
@@ -334,11 +323,12 @@ async def test_primary_key_verification_failure(
 ) -> None:
     """Test that primary key verification failure prevents deletion."""
     from unittest.mock import patch
+
     from archiver.checkpoint import CheckpointManager
 
     # Clean up any existing watermarks/checkpoints for this table
     checkpoint_manager = CheckpointManager(storage_type="s3")
-    
+
     try:
         await checkpoint_manager.delete_checkpoint(
             database_name=archiver_config.databases[0].name,
@@ -372,7 +362,7 @@ async def test_primary_key_verification_failure(
 
         # Error is caught and logged, table marked as failed (doesn't raise)
         stats = await archiver.archive()
-        
+
         # Table should be marked as failed
         assert stats["tables_failed"] == 1
         assert stats["tables_processed"] == 0
@@ -437,7 +427,7 @@ async def test_dry_run_no_changes(
         aws_secret_access_key="minioadmin",
     )
 
-    response = s3.list_objects_v2(
+    _ = s3.list_objects_v2(
         Bucket="test-archives", Prefix=f"test_db/{test_table}/"
     )
     # Should have no new files from this test (or count existing ones)

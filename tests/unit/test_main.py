@@ -1,13 +1,11 @@
 """Unit tests for main CLI entry point."""
 
-import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig
 from archiver.exceptions import ConfigurationError
 from archiver.main import main
 

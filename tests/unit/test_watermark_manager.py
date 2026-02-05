@@ -1,18 +1,15 @@
 """Unit tests for watermark management."""
 
 import json
-import tempfile
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from archiver.watermark_manager import WatermarkManager
-from archiver.s3_client import S3Client
 from archiver.config import S3Config
 from archiver.database import DatabaseManager
-from archiver.config import DatabaseConfig
+from archiver.s3_client import S3Client
+from archiver.watermark_manager import WatermarkManager
 
 
 @pytest.fixture

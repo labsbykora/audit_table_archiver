@@ -203,7 +203,7 @@ Threshold violation detected for metric: {metric}
         Returns:
             Tuple of (subject, message, metadata)
         """
-        subject = f"📊 Daily Archive Summary"
+        subject = "📊 Daily Archive Summary"
         message = f"""
 Daily archival summary for {datetime.now(timezone.utc).strftime('%Y-%m-%d')}
 

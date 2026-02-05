@@ -8,13 +8,11 @@ import pytest
 import yaml
 
 from archiver.config import (
-    ArchiverConfig,
     DatabaseConfig,
     S3Config,
     TableConfig,
     load_config,
 )
-from archiver.exceptions import ConfigurationError
 
 
 def test_s3_config_validation() -> None:
@@ -65,7 +63,7 @@ def test_database_config_validation() -> None:
 def test_database_config_missing_password_env() -> None:
     """Test database config fails when password env var missing."""
     from archiver.config import TableConfig
-    
+
     config = DatabaseConfig(
         name="test_db",
         host="localhost",
@@ -80,7 +78,7 @@ def test_database_config_missing_password_env() -> None:
             )
         ],
     )
-    
+
     # Password validation happens when get_password() is called, not during initialization
     with pytest.raises(ValueError, match="Environment variable.*not set"):
         config.get_password()

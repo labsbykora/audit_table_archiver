@@ -1,15 +1,9 @@
 """End-to-end integration tests."""
 
 import os
-import sys
 from pathlib import Path
 
 import pytest
-
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 from archiver.archiver import Archiver
 from archiver.config import ArchiverConfig
@@ -56,7 +50,6 @@ async def test_batch_processor_select_batch(
     """Test batch processor can select batches."""
     from archiver.batch_processor import BatchProcessor
     from archiver.config import DatabaseConfig, TableConfig
-    from archiver.database import DatabaseManager
 
     os.environ["TEST_DB_PASSWORD"] = "archiver_password"
 
@@ -112,9 +105,10 @@ async def test_batch_processor_select_batch(
 @pytest.mark.asyncio
 async def test_serialization_and_compression(test_data: list) -> None:
     """Test serialization and compression work together."""
+    from datetime import datetime, timezone
+
     from archiver.compressor import Compressor
     from archiver.serializer import PostgreSQLSerializer
-    from datetime import datetime, timezone
 
     serializer = PostgreSQLSerializer()
     compressor = Compressor()
@@ -220,8 +214,9 @@ async def test_full_archival_with_delete(
 
     # Verify files uploaded to S3
     # Check that files exist for this specific archival run
-    import boto3
     from datetime import datetime, timezone
+
+    import boto3
 
     s3 = boto3.client(
         "s3",
@@ -234,7 +229,7 @@ async def test_full_archival_with_delete(
     today = datetime.now(timezone.utc).strftime("year=%Y/month=%m/day=%d")
     prefix = f"test/{archiver_config.databases[0].name}/{test_table}/{today}/"
     response = s3.list_objects_v2(Bucket="test-archives", Prefix=prefix)
-    
+
     # Should have at least one file for the batches processed
     assert "Contents" in response
     assert len(response["Contents"]) >= stats["batches_processed"]
@@ -259,12 +254,12 @@ async def test_verification_failure_prevents_delete(
 
         archiver_config.s3.aws_access_key_id = "minioadmin"
         archiver_config.s3.aws_secret_access_key = "minioadmin"
-        
+
         archiver = Archiver(archiver_config, dry_run=False)
 
         # Error is caught and logged, table marked as failed (doesn't raise)
         stats = await archiver.archive()
-        
+
         # Table should be marked as failed
         assert stats["tables_failed"] == 1
         assert stats["tables_processed"] == 0

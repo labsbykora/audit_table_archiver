@@ -11,7 +11,7 @@ from typing import Any, Optional
 import click
 import structlog
 
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, load_config
+from archiver.config import ArchiverConfig, DatabaseConfig, load_config
 from archiver.database import DatabaseManager
 from archiver.s3_client import S3Client
 from restore.restore_engine import RestoreEngine
@@ -174,7 +174,7 @@ def main(
     # Configure logging
     # Verbose mode automatically enables DEBUG level for more detailed output
     effective_log_level = "DEBUG" if verbose else log_level
-    
+
     # For list command, suppress logs for cleaner output
     is_list_command = not s3_key and not restore_all and database and table
     if is_list_command:
@@ -187,12 +187,12 @@ def main(
     else:
         log_level_override = effective_log_level.upper()
         log_format_override = log_format  # Use provided format (default: console)
-    
+
     configure_logging(
         log_level=log_level_override,
         log_format=log_format_override,
     )
-    
+
     # Suppress noisy third-party library logs in verbose mode
     # Keep boto3/botocore at WARNING level to reduce noise while keeping our DEBUG logs
     if verbose:
@@ -200,7 +200,7 @@ def main(
         std_logging.getLogger("boto3").setLevel(std_logging.WARNING)
         std_logging.getLogger("botocore").setLevel(std_logging.WARNING)
         std_logging.getLogger("urllib3").setLevel(std_logging.WARNING)
-    
+
     logger = get_logger("restore_cli")
 
     try:
@@ -236,7 +236,7 @@ def main(
                         # Remove prefix
                         relative_key = s3_key[len(prefix) + 1 :] if s3_key.startswith(prefix + "/") else s3_key[len(prefix):]
                         parts = relative_key.split("/")
-                    
+
                     if not database and len(parts) >= 1:
                         database = parts[0]
                     if not table and len(parts) >= 2:
@@ -342,7 +342,7 @@ async def _list_archives(
         database_name=database_name,
         table_name=table_name,
     )
-    
+
     # Suppress JSON logs for cleaner output (already using console format)
     if archives:
         # Format output nicely
@@ -353,7 +353,7 @@ async def _list_archives(
         click.echo()
         click.echo(click.style(f"Found {len(archives)} archive(s):", fg="green", bold=True))
         click.echo()
-        
+
         # Group archives by date for better readability
         archives_by_date: dict[str, list[str]] = defaultdict(list)
         for archive_key in sorted(archives):
@@ -368,7 +368,7 @@ async def _list_archives(
                 except Exception:
                     pass
             archives_by_date[date_str].append(archive_key)
-        
+
         # Display grouped by date
         for date_str in sorted(archives_by_date.keys()):
             if date_str != "Unknown":
@@ -380,7 +380,7 @@ async def _list_archives(
                 # Show full path in dim text if verbose
                 if len(archive_key) > 80:
                     click.echo(click.style(f"      {archive_key[:77]}...", dim=True))
-        
+
         click.echo()
         click.echo(click.style("-" * 70, dim=True))
         click.echo()
@@ -405,11 +405,11 @@ async def _list_archives(
     else:
         click.echo()
         click.echo(click.style("=" * 70, fg="yellow"))
-        click.echo(click.style(f"No Archives Found", fg="yellow", bold=True))
+        click.echo(click.style("No Archives Found", fg="yellow", bold=True))
         click.echo(click.style("=" * 70, fg="yellow"))
         click.echo()
-        click.echo(click.style(f"Database: ", fg="white") + click.style(database_name, fg="cyan", bold=True))
-        click.echo(click.style(f"Table: ", fg="white") + click.style(table_name, fg="cyan", bold=True))
+        click.echo(click.style("Database: ", fg="white") + click.style(database_name, fg="cyan", bold=True))
+        click.echo(click.style("Table: ", fg="white") + click.style(table_name, fg="cyan", bold=True))
         click.echo()
         click.echo(click.style("No archived files found for this table.", dim=True))
         click.echo(click.style("Make sure archives exist in S3 and the path is correct.", dim=True))
@@ -656,7 +656,7 @@ async def _restore_all(
             click.echo(f"\nNo new archives to restore for database '{database_name}', table '{table_name}'")
             click.echo(f"Last restored: {watermark.last_restored_date.isoformat()}")
             click.echo(f"Total archives already restored: {watermark.total_archives_restored}")
-            click.echo(f"\nTip: Use --ignore-watermark to restore all archives regardless of watermark")
+            click.echo("\nTip: Use --ignore-watermark to restore all archives regardless of watermark")
         else:
             click.echo(f"\nNo archives found for database '{database_name}', table '{table_name}'")
         return
@@ -715,10 +715,10 @@ async def _restore_all(
             "records_failed": 0,
             "conflicts_detected": 0,
         }
-        
+
         # Track detailed failure information
         failed_files: list[dict[str, Any]] = []
-        
+
         # Track skip reasons
         skip_reasons: dict[str, int] = {}
 
@@ -746,7 +746,7 @@ async def _restore_all(
             progress_interval = 10  # Show every 10 files
         else:
             progress_interval = max(10, total_files // 10)  # Show ~10 updates
-        
+
         for idx, archive_key in enumerate(sorted(archive_keys), 1):
             try:
                 logger.debug(
@@ -780,7 +780,7 @@ async def _restore_all(
                 total_stats["records_skipped"] += stats.get("records_skipped", 0)
                 total_stats["records_failed"] += stats.get("records_failed", 0)
                 total_stats["conflicts_detected"] += stats.get("conflicts_detected", 0)
-                
+
                 # Track latest restored archive for watermark update
                 # Always track (even when ignoring watermark) so we can update watermark at the end
                 if restore_watermark_manager:
@@ -789,7 +789,7 @@ async def _restore_all(
                         if latest_restored_date is None or archive_date > latest_restored_date:
                             latest_restored_date = archive_date
                             latest_restored_key = archive_key
-                        
+
                         # Update watermark after each archive if configured (only if not ignoring watermark)
                         if not ignore_watermark and archiver_config.restore_watermark.update_after_each_archive:
                             try:
@@ -817,7 +817,7 @@ async def _restore_all(
                                     archive_key=archive_key,
                                     error=str(e),
                                 )
-                
+
                 # Track skip reasons
                 # Only track conflict types if we have detailed breakdown
                 # Otherwise, use the generic skip reason
@@ -845,7 +845,7 @@ async def _restore_all(
                     records_restored=stats.get("records_restored", 0),
                     records_skipped=stats.get("records_skipped", 0),
                 )
-                
+
                 # Show progress periodically
                 if idx % progress_interval == 0 or idx == total_files:
                     percent_complete = (idx / total_files) * 100
@@ -867,7 +867,7 @@ async def _restore_all(
                 total_stats["files_failed"] += 1
                 error_type = type(e).__name__
                 error_msg = str(e)
-                
+
                 # Store failure details
                 failed_files.append({
                     "file": archive_key,
@@ -875,7 +875,7 @@ async def _restore_all(
                     "error_type": error_type,
                     "error": error_msg,
                 })
-                
+
                 logger.error(
                     "Failed to restore archive",
                     file_number=idx,
@@ -907,7 +907,7 @@ async def _restore_all(
                             )
                         except Exception:
                             current_watermark = None
-                    
+
                     await restore_watermark_manager.save_watermark(
                         database_name=database_name,
                         table_name=table_name,
@@ -950,12 +950,17 @@ async def _restore_all(
             schema=schema_name,
             failed_files_count=len(failed_files),
         )
-        
+
         # Use formatted output utilities
-        from utils.output import print_header, print_section, print_key_value, print_warning, print_info
-        
+        from utils.output import (
+            print_header,
+            print_info,
+            print_key_value,
+            print_section,
+        )
+
         print_header("Restore Summary")
-        
+
         print_section("Files")
         print_key_value("Processed", total_stats['files_processed'])
         print_key_value("Failed", total_stats['files_failed'], value_color="red" if total_stats['files_failed'] > 0 else "white")
@@ -964,26 +969,26 @@ async def _restore_all(
             print_key_value("Already Restored (Skipped)", len(all_archive_keys) - len(archive_keys), value_color="yellow")
         if ignore_watermark:
             print_info("Watermark ignored - all archives processed")
-        
+
         print_section("Records")
         print_key_value("Processed", f"{total_stats['records_processed']:,}")
         print_key_value("Restored", f"{total_stats['records_restored']:,}", value_color="green")
         print_key_value("Skipped", f"{total_stats['records_skipped']:,}", value_color="yellow" if total_stats['records_skipped'] > 0 else "white")
         print_key_value("Failed", f"{total_stats['records_failed']:,}", value_color="red" if total_stats['records_failed'] > 0 else "white")
-        
+
         # Show skip reasons if any
         if skip_reasons:
             print_section("Skip Reasons", color="yellow")
             for reason, count in sorted(skip_reasons.items(), key=lambda x: x[1], reverse=True):
                 reason_display = reason.replace("_", " ").title()
                 print_key_value(reason_display, f"{count:,}", value_color="yellow")
-        
+
         # Show conflicts if any
         if total_stats.get("conflicts_detected", 0) > 0:
             print_section("Conflicts", color="yellow")
             print_key_value("Total Conflicts Detected", f"{total_stats['conflicts_detected']:,}")
             print_key_value("Conflict Strategy", conflict_strategy)
-        
+
         # Show failed files if any
         if failed_files:
             print_section(f"Failed Files ({len(failed_files)})", color="red")
@@ -994,7 +999,7 @@ async def _restore_all(
                 if error_type not in failures_by_type:
                     failures_by_type[error_type] = []
                 failures_by_type[error_type].append(failure)
-            
+
             # Show summary by error type
             for error_type, failures in sorted(failures_by_type.items(), key=lambda x: len(x[1]), reverse=True):
                 click.echo(f"\n  {error_type}: {len(failures)} file(s)")
@@ -1005,14 +1010,14 @@ async def _restore_all(
                     click.echo(f"    • {file_name}: {error_msg}")
                 if len(failures) > 3:
                     click.echo(f"    ... and {len(failures) - 3} more file(s) with the same error")
-            
+
             # Optionally show all failed files if verbose
             if verbose:
-                click.echo(f"\n  All failed files:")
+                click.echo("\n  All failed files:")
                 for failure in failed_files:
                     click.echo(f"    [{failure['file_number']}/{len(archive_keys)}] {failure['file']}")
                     click.echo(f"      Error: {failure['error_type']}: {failure['error']}")
-        
+
         click.echo()
 
     finally:

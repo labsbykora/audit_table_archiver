@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 import click
-import structlog
 import yaml
 
 from archiver.config import ArchiverConfig
@@ -17,7 +16,7 @@ src_path = Path(__file__).parent.parent.parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from utils.logging import configure_logging, get_logger
+from utils.logging import configure_logging, get_logger  # noqa: E402
 
 
 @click.command()
@@ -246,7 +245,6 @@ def main(
 
             # Select tables to archive
             click.echo("Select tables to archive:")
-            selected_tables = []
             for i, table in enumerate(tables, 1):
                 has_timestamp = table["suggested_timestamp"] is not None
                 has_pk = table["primary_key"] is not None
@@ -412,7 +410,7 @@ def main(
 
         click.echo(f"✓ Configuration saved to {output}")
         click.echo("\nNext steps:")
-        click.echo(f"  1. Set environment variable: export DB_PASSWORD='your_password'")
+        click.echo("  1. Set environment variable: export DB_PASSWORD='your_password'")
         click.echo(f"  2. Test configuration: archiver --config {output} --dry-run")
         click.echo(f"  3. Run archiver: archiver --config {output}")
 

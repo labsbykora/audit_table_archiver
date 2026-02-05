@@ -1,9 +1,6 @@
 """Unit tests for logging module."""
 
-import logging
-from unittest.mock import patch
 
-import pytest
 
 from utils.logging import configure_logging, get_logger
 

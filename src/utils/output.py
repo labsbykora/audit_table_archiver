@@ -1,6 +1,6 @@
 """Utility functions for formatted CLI output."""
 
-from typing import Any, Optional
+from typing import Any
 
 import click
 
@@ -136,7 +136,7 @@ def print_summary(stats: dict[str, Any], title: str = "Summary") -> None:
         if records_archived_this_run is None:
             records_archived_this_run = stats.get("records_archived", 0)
         records_archived_total = stats.get("records_archived_total")
-        
+
         if records_archived_total is not None and records_archived_total > records_archived_this_run:
             # Both metrics available and different - show both
             print_key_value("Archived (This Run)", f"{records_archived_this_run:,}")

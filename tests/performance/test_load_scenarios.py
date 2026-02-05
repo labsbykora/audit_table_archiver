@@ -19,8 +19,9 @@ async def test_sustained_load_1h(
     db_connection,
 ):
     """Test sustained load for 1 hour to check for memory leaks."""
-    import psutil
     import os
+
+    import psutil
 
     # Insert large dataset
     now = datetime.now(timezone.utc)
@@ -109,7 +110,7 @@ async def test_sustained_load_1h(
 
     print(f"\nLoad test completed: {len(memory_samples)} iterations")
     print(f"Memory range: {min(memory_samples):.0f} - {max(memory_samples):.0f} MB")
-    print(f"Memory trend: Stable (no significant leak detected)")
+    print("Memory trend: Stable (no significant leak detected)")
 
 
 @pytest.mark.performance
@@ -195,8 +196,9 @@ async def test_large_batch_size(
     db_connection,
 ):
     """Test with very large batch size to verify memory management."""
-    import psutil
     import os
+
+    import psutil
 
     # Insert 200K records
     now = datetime.now(timezone.utc)

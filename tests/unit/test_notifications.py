@@ -1,6 +1,5 @@
 """Unit tests for notification channels."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

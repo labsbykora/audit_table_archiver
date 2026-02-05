@@ -1,6 +1,5 @@
 """Adaptive batch sizing based on performance metrics."""
 
-import time
 from typing import Optional
 
 import structlog
@@ -36,7 +35,7 @@ class AdaptiveBatchSizer:
         self.target_query_time = target_query_time
         self.adjustment_factor = adjustment_factor
         self.logger = logger or get_logger("adaptive_batch")
-        
+
         self.query_times: list[float] = []  # Track recent query times
         self.max_history = 10  # Keep last 10 query times
 
@@ -47,12 +46,6 @@ class AdaptiveBatchSizer:
             query_time: Query execution time in seconds
             records_fetched: Number of records fetched
         """
-        # Calculate time per record
-        if records_fetched > 0:
-            time_per_record = query_time / records_fetched
-        else:
-            time_per_record = query_time
-
         self.query_times.append(query_time)
         if len(self.query_times) > self.max_history:
             self.query_times.pop(0)

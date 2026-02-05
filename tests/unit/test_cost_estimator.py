@@ -1,9 +1,9 @@
 """Unit tests for cost estimation module."""
 
-import pytest
-from datetime import datetime
 
-from cost.cost_estimator import CostEstimator, CostEstimate, StorageClass
+import pytest
+
+from cost.cost_estimator import CostEstimate, CostEstimator, StorageClass
 
 
 class TestCostEstimate:

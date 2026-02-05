@@ -1,11 +1,11 @@
 """Unit tests for conflict resolver module."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from archiver.database import DatabaseManager
-from archiver.exceptions import VerificationError
-from restore.conflict_resolver import ConflictDetector, ConflictResolver, ConflictReport
+from restore.conflict_resolver import ConflictDetector, ConflictReport, ConflictResolver
 
 
 class TestConflictReport:
@@ -128,7 +128,7 @@ class TestConflictDetector:
             def __init__(self, pk_value):
                 super().__init__()
                 self[primary_key] = pk_value  # Store as int to match record values
-        
+
         mock_row1 = MockRow(1)
         mock_row2 = MockRow(2)
         db_manager.fetch = AsyncMock(return_value=[mock_row1, mock_row2])

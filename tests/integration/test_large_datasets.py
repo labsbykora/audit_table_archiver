@@ -1,12 +1,11 @@
 """Integration tests for large dataset scenarios."""
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from archiver.archiver import Archiver
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig
+from archiver.config import ArchiverConfig
 
 
 @pytest.mark.integration
@@ -132,8 +131,9 @@ async def test_memory_usage_large_batch(
     db_connection,
 ):
     """Test memory usage with large batch size."""
-    import psutil
     import os
+
+    import psutil
 
     # Insert 100K test records
     now = datetime.now(timezone.utc)

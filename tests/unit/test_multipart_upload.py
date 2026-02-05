@@ -1,14 +1,12 @@
 """Unit tests for multipart upload."""
 
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from archiver.exceptions import S3Error
-from archiver.multipart_upload import MultipartUploadState, MultipartUploader
+from archiver.multipart_upload import MultipartUploader, MultipartUploadState
 
 
 class TestMultipartUploadState:

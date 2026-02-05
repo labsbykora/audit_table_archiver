@@ -81,7 +81,7 @@ async def test_database_manager_connect(db_config: DatabaseConfig) -> None:
     with patch("asyncpg.create_pool", new_callable=AsyncMock) as mock_create_pool:
         # Mock pool instance
         mock_pool_instance = AsyncMock()
-        
+
         # Mock connection for health check
         mock_conn = AsyncMock()
         mock_conn.fetchval = AsyncMock(return_value="PostgreSQL 14.5")
@@ -444,26 +444,24 @@ async def test_database_manager_transaction(db_config: DatabaseConfig) -> None:
 
     mock_pool = AsyncMock()
     mock_conn = AsyncMock()
-    mock_transaction = AsyncMock()
-    
     async def aenter(self):
         return mock_conn
     async def aexit(self, exc_type, exc_val, exc_tb):
         return None
-    
+
     async def tenter(self):
         return mock_conn
     async def texit(self, exc_type, exc_val, exc_tb):
         return None
-    
+
     mock_acquire_context = MagicMock()
     mock_acquire_context.__aenter__ = aenter
     mock_acquire_context.__aexit__ = aexit
-    
+
     mock_transaction_context = MagicMock()
     mock_transaction_context.__aenter__ = tenter
     mock_transaction_context.__aexit__ = texit
-    
+
     mock_conn.transaction = MagicMock(return_value=mock_transaction_context)
     mock_pool.acquire = MagicMock(return_value=mock_acquire_context)
 
@@ -471,6 +469,6 @@ async def test_database_manager_transaction(db_config: DatabaseConfig) -> None:
 
     async with manager.transaction() as conn:
         assert conn == mock_conn
-    
+
     mock_conn.transaction.assert_called_once()
 

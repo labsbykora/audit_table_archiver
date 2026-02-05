@@ -1,12 +1,10 @@
 """S3 client for uploading archived data."""
 
-import hashlib
-import time
 from pathlib import Path
 from typing import Any, Optional
 
 import boto3
-from botocore.exceptions import ClientError, BotoCoreError
+from botocore.exceptions import BotoCoreError, ClientError
 from structlog import BoundLogger
 
 from archiver.config import S3Config
@@ -16,7 +14,7 @@ from archiver.multipart_upload import MultipartUploader
 from archiver.s3_rate_limiter import S3RateLimiter
 from utils.circuit_breaker import CircuitBreaker
 from utils.logging import get_logger
-from utils.retry import RetryConfig, retry_async, retry_sync
+from utils.retry import RetryConfig, retry_sync
 
 
 class S3Client:
@@ -38,7 +36,7 @@ class S3Client:
         self._client: Optional[Any] = None
         self._multipart_uploader: Optional[MultipartUploader] = None
         self._local_fallback: Optional[LocalFallback] = None
-        
+
         # Circuit breaker for S3 operations
         self.circuit_breaker = CircuitBreaker(
             failure_threshold=5,
@@ -46,7 +44,7 @@ class S3Client:
             expected_exception=(ClientError, BotoCoreError),
             logger=self.logger,
         )
-        
+
         # Retry configuration for S3 operations
         self.retry_config = RetryConfig(
             max_attempts=3,
@@ -56,7 +54,7 @@ class S3Client:
             jitter=True,
             retryable_exceptions=(ClientError, BotoCoreError),
         )
-        
+
         # Rate limiter if configured
         if self.config.rate_limit_requests_per_second:
             self._rate_limiter = S3RateLimiter(
@@ -65,7 +63,7 @@ class S3Client:
             )
         else:
             self._rate_limiter = None
-        
+
         # Local fallback if configured
         if self.config.local_fallback_dir:
             from pathlib import Path
@@ -82,7 +80,7 @@ class S3Client:
             try:
                 # Get credentials from config or environment
                 credentials = self.config.get_credentials()
-                
+
                 if credentials:
                     # Use explicit credentials
                     session = boto3.Session(
@@ -92,7 +90,7 @@ class S3Client:
                 else:
                     # Use default credential chain (IAM role, AWS credentials file, env vars)
                     session = boto3.Session()
-                
+
                 s3_kwargs: dict[str, Any] = {
                     "service_name": "s3",
                     "region_name": self.config.region,
@@ -239,7 +237,7 @@ class S3Client:
         try:
             # Use circuit breaker to prevent cascading failures
             result = self.circuit_breaker.call(_upload_internal)
-            
+
             self.logger.debug(
                 "File upload successful",
                 bucket=self.config.bucket,
@@ -247,10 +245,10 @@ class S3Client:
                 size=file_size,
                 etag=result.get("etag", ""),
             )
-            
+
             return result
-            
-        except (ClientError, BotoCoreError) as e:
+
+        except (ClientError, BotoCoreError):
             # Retry with exponential backoff and jitter
             try:
                 result = retry_sync(
@@ -258,7 +256,7 @@ class S3Client:
                     config=self.retry_config,
                     logger=self.logger,
                 )
-                
+
                 self.logger.debug(
                     "File upload successful after retry",
                     bucket=self.config.bucket,
@@ -266,7 +264,7 @@ class S3Client:
                     size=file_size,
                     etag=result.get("etag", ""),
                 )
-                
+
                 return result
             except Exception as retry_error:
                 # Try to save to local fallback if configured
@@ -295,7 +293,7 @@ class S3Client:
                             key=full_key,
                             fallback_error=str(fallback_error),
                         )
-                
+
                 raise S3Error(
                     f"File upload failed after retries: {retry_error}",
                     context={
@@ -537,19 +535,6 @@ class S3Client:
                 },
             ) from e
 
-            self.logger.debug(
-                "Upload verification successful",
-                bucket=self.config.bucket,
-                key=s3_key,
-                size=actual_size,
-            )
-
-        except ClientError as e:
-            raise S3Error(
-                f"Upload verification failed: {e}",
-                context={"bucket": self.config.bucket, "key": s3_key},
-            ) from e
-
     def object_exists(self, s3_key: str) -> bool:
         """Check if object exists in S3.
 
@@ -572,7 +557,7 @@ class S3Client:
                 full_key = s3_key
         else:
             full_key = s3_key
-        
+
         try:
             self.client.head_object(Bucket=self.config.bucket, Key=full_key)
             return True

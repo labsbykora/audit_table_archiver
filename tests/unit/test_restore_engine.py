@@ -1,8 +1,7 @@
 """Unit tests for restore engine."""
 
-from datetime import datetime, timezone
-from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import asyncpg
 import pytest
@@ -257,7 +256,6 @@ class TestRestoreEngine:
         """Test restore with empty archive."""
         # Create empty archive
         import gzip
-        import json
 
         empty_jsonl = b""
         empty_compressed = gzip.compress(empty_jsonl)

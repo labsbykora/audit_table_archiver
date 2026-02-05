@@ -2,15 +2,20 @@
 
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from prometheus_client import CollectorRegistry
 
 from archiver.archiver import Archiver
-from archiver.config import ArchiverConfig, DatabaseConfig, S3Config, TableConfig, DefaultsConfig, MonitoringConfig
-from archiver.exceptions import DatabaseError, S3Error, VerificationError
+from archiver.config import (
+    ArchiverConfig,
+    DatabaseConfig,
+    DefaultsConfig,
+    MonitoringConfig,
+    S3Config,
+    TableConfig,
+)
+from archiver.exceptions import DatabaseError
 
 
 @pytest.fixture
@@ -19,7 +24,7 @@ def archiver_config() -> ArchiverConfig:
     os.environ.setdefault("TEST_DB_PASSWORD", "test_password")
     os.environ.setdefault("AWS_ACCESS_KEY_ID", "minioadmin")
     os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "minioadmin")
-    
+
     return ArchiverConfig(
         version="1.0",
         defaults=DefaultsConfig(
@@ -73,7 +78,7 @@ async def test_archiver_init(archiver_config: ArchiverConfig) -> None:
     else:
         archiver_config.monitoring.metrics_enabled = False
     archiver = Archiver(archiver_config, dry_run=True)
-    
+
     assert archiver.config == archiver_config
     assert archiver.dry_run is True
     assert archiver.serializer is not None
@@ -98,20 +103,20 @@ async def test_archiver_archive_sequential(archiver: Archiver) -> None:
     mock_db_manager.connect = AsyncMock()
     mock_db_manager.disconnect = AsyncMock()
     mock_db_manager.health_check = AsyncMock(return_value=True)
-    
+
     # Mock S3 client
     mock_s3_client = MagicMock()
     mock_s3_client.validate_bucket = AsyncMock()
-    
+
     # Mock batch processor
     mock_batch_processor = MagicMock()
     mock_batch_processor.count_eligible_records = AsyncMock(return_value=0)
-    
+
     with patch("archiver.archiver.DatabaseManager", return_value=mock_db_manager):
         with patch("archiver.archiver.S3Client", return_value=mock_s3_client):
             with patch("archiver.archiver.BatchProcessor", return_value=mock_batch_processor):
                 stats = await archiver.archive()
-    
+
     assert stats["databases_processed"] >= 0
     assert "start_time" in stats
     assert "end_time" in stats
@@ -128,28 +133,28 @@ async def test_archiver_archive_parallel(archiver_config: ArchiverConfig) -> Non
         archiver_config.monitoring = MonitoringConfig(metrics_enabled=False)
     else:
         archiver_config.monitoring.metrics_enabled = False
-    
+
     archiver = Archiver(archiver_config, dry_run=False)
-    
+
     # Mock database manager
     mock_db_manager = MagicMock()
     mock_db_manager.connect = AsyncMock()
     mock_db_manager.disconnect = AsyncMock()
     mock_db_manager.health_check = AsyncMock(return_value=True)
-    
+
     # Mock S3 client
     mock_s3_client = MagicMock()
     mock_s3_client.validate_bucket = AsyncMock()
-    
+
     # Mock batch processor
     mock_batch_processor = MagicMock()
     mock_batch_processor.count_eligible_records = AsyncMock(return_value=0)
-    
+
     with patch("archiver.archiver.DatabaseManager", return_value=mock_db_manager):
         with patch("archiver.archiver.S3Client", return_value=mock_s3_client):
             with patch("archiver.archiver.BatchProcessor", return_value=mock_batch_processor):
                 stats = await archiver.archive()
-    
+
     assert stats["databases_processed"] >= 0
     assert "database_stats" in stats
 
@@ -160,15 +165,15 @@ async def test_archiver_archive_database_failure(archiver: Archiver) -> None:
     # Mock database manager to raise error
     mock_db_manager = MagicMock()
     mock_db_manager.connect = AsyncMock(side_effect=DatabaseError("Connection failed"))
-    
+
     # Mock S3 client
     mock_s3_client = MagicMock()
     mock_s3_client.validate_bucket = AsyncMock()
-    
+
     with patch("archiver.archiver.DatabaseManager", return_value=mock_db_manager):
         with patch("archiver.archiver.S3Client", return_value=mock_s3_client):
             stats = await archiver.archive()
-    
+
     assert stats["databases_failed"] == 1
     assert stats["databases_processed"] == 0
     assert len(stats["database_stats"]) == 1
@@ -180,7 +185,7 @@ async def test_archiver_archive_database_failure(archiver: Archiver) -> None:
 async def test_archiver_generate_batch_id(archiver: Archiver) -> None:
     """Test batch ID generation."""
     batch_id = archiver._generate_batch_id("test_db", "test_table", 1)
-    
+
     assert isinstance(batch_id, str)
     assert len(batch_id) == 16  # SHA-256 hash truncated to 16 chars
     # Batch ID is a hash, so it won't contain the original strings directly
@@ -194,16 +199,15 @@ async def test_archiver_load_previous_schema(archiver: Archiver) -> None:
     """Test loading previous schema from S3."""
     # Mock S3 client
     mock_s3_client = MagicMock()
-    
+
     # Test with no previous schema
     mock_s3_client.list_objects = MagicMock(return_value=[])
     schema = await archiver._load_previous_schema(mock_s3_client, "test_db", "test_table")
     assert schema is None
-    
+
     # Test with previous schema
     import json
-    from datetime import datetime, timezone
-    
+
     mock_metadata = {
         "version": "1.0",
         "batch_info": {"batch_number": 1},
@@ -214,7 +218,7 @@ async def test_archiver_load_previous_schema(archiver: Archiver) -> None:
     }
     metadata_json = json.dumps(mock_metadata)
     metadata_bytes = metadata_json.encode("utf-8")
-    
+
     mock_s3_client.list_objects = MagicMock(return_value=[
         {
             "key": "test_db/test_table/year=2024/month=01/day=01/batch_1.metadata.json",
@@ -222,7 +226,7 @@ async def test_archiver_load_previous_schema(archiver: Archiver) -> None:
         }
     ])
     mock_s3_client.get_object_bytes = MagicMock(return_value=metadata_bytes)
-    
+
     # Mock metadata_from_json
     with patch.object(archiver.metadata_generator, "metadata_from_json", return_value=mock_metadata):
         schema = await archiver._load_previous_schema(mock_s3_client, "test_db", "test_table")

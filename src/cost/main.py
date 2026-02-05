@@ -5,18 +5,17 @@ from pathlib import Path
 from typing import Optional
 
 import click
-import structlog
 
-from archiver.config import ArchiverConfig, load_config
+from archiver.config import load_config
 from archiver.exceptions import ConfigurationError
-from cost.cost_estimator import CostEstimator, CostEstimate, StorageClass
+from cost.cost_estimator import CostEstimator, StorageClass
 
 # Import from utils package
 src_path = Path(__file__).parent.parent.parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from utils.logging import configure_logging, get_logger
+from utils.logging import configure_logging, get_logger  # noqa: E402
 
 
 @click.command()
@@ -150,8 +149,6 @@ def main(
             click.echo("Estimating costs for configured tables...\n")
 
             total_uncompressed_gb = 0.0
-            estimates = []
-
             for db in archiver_config.databases:
                 for table in db.tables:
                     # Estimate based on retention period and batch size
@@ -164,12 +161,6 @@ def main(
                     click.echo("  Note: Actual size depends on data. Use --size-gb for precise estimates.\n")
 
             # Use S3 config from archiver config
-            s3_region = archiver_config.s3.region or region
-            s3_storage_class = StorageClass(
-                archiver_config.s3.storage_class.upper()
-                if archiver_config.s3.storage_class
-                else storage_class
-            )
 
             if not size_gb:
                 click.echo(
@@ -219,10 +210,10 @@ def main(
                 }
                 click.echo(json.dumps(result, indent=2))
             else:
-                from utils.output import print_header, print_section, print_key_value, print_table
-                
+                from utils.output import print_header, print_key_value, print_section, print_table
+
                 print_header(f"Cost Comparison ({total_uncompressed_gb:,.2f} GB uncompressed)")
-                
+
                 # Create table
                 headers = ["Storage Class", "Monthly Cost", "Annual Cost"]
                 rows = []
@@ -251,15 +242,15 @@ def main(
 
                 click.echo(json.dumps(estimate.to_dict(), indent=2))
             else:
-                from utils.output import print_header, print_section, print_key_value
-                
+                from utils.output import print_header, print_key_value, print_section
+
                 print_header("Cost Estimate")
                 print_section("Storage")
                 print_key_value("Uncompressed Size", f"{estimate.total_size_gb:,.2f} GB")
                 print_key_value("Compressed Size", f"{estimate.compressed_size_gb:,.2f} GB")
                 print_key_value("Storage Class", storage_class_enum.value)
                 print_key_value("Region", region)
-                
+
                 print_section("Costs")
                 print_key_value("Monthly Storage", f"${estimate.monthly_storage_cost:,.2f}")
                 if estimate.monthly_retrieval_cost > 0:
