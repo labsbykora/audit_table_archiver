@@ -43,17 +43,16 @@ jobs:
 
     # --- Lint & format (fail fast, before starting services) ---
     - name: Auto-fix with ruff
-      run: |
-        ruff check --fix .
+      run: ruff check --fix .
+
+    - name: Auto-format with black
+      run: black .
 
     - name: Verify linting
-      run: |
-        ruff check .
+      run: ruff check .
 
-    - name: Format check with black
-      run: |
-        black --version
-        black --check .
+    - name: Verify formatting
+      run: black --check .
 
     - name: Type check with mypy
       run: |
