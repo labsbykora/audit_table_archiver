@@ -131,6 +131,10 @@ class TestRestoreEngine:
         """Test restore with overwrite conflict strategy."""
         mock_conn = MagicMock()
         mock_conn.executemany = AsyncMock(return_value="INSERT 0 2")
+        mock_conn.fetchval = AsyncMock(return_value="id")  # Primary key detection
+        mock_conn.fetch = AsyncMock(return_value=[])  # Schema detection returns empty
+        mock_conn.fetchone = AsyncMock(return_value=None)  # No schema rows
+        mock_conn.fetchrow = AsyncMock(return_value=None)  # No schema rows
         mock_conn.transaction = MagicMock()
         mock_conn.transaction.return_value.__aenter__ = AsyncMock(return_value=None)
         mock_conn.transaction.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -138,6 +142,8 @@ class TestRestoreEngine:
         mock_db_manager.pool.acquire = MagicMock()
         mock_db_manager.pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
         mock_db_manager.pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+        mock_db_manager.fetch = AsyncMock(return_value=[])
+        mock_db_manager.fetchone = AsyncMock(return_value=None)
 
         engine = RestoreEngine(mock_db_manager)
 
@@ -148,9 +154,10 @@ class TestRestoreEngine:
         )
 
         assert stats["records_restored"] == 2
-        # Verify ON CONFLICT DO UPDATE was used
+        # Verify ON CONFLICT (pk) DO UPDATE was used
         call_args = mock_conn.executemany.call_args[0][0]
-        assert "ON CONFLICT DO UPDATE" in call_args
+        assert "ON CONFLICT" in call_args
+        assert "DO UPDATE" in call_args
 
     @pytest.mark.asyncio
     async def test_restore_archive_fail_strategy(

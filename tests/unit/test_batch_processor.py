@@ -90,9 +90,7 @@ async def test_count_eligible_records(batch_processor: BatchProcessor) -> None:
     mock_db_manager = MagicMock()
     # First call: _is_timestamp_column_timezone_aware (data_type lookup)
     # Second call: actual COUNT(*) query
-    mock_db_manager.fetchval = AsyncMock(
-        side_effect=["timestamp with time zone", 100]
-    )
+    mock_db_manager.fetchval = AsyncMock(side_effect=["timestamp with time zone", 100])
     batch_processor.db_manager = mock_db_manager
 
     count = await batch_processor.count_eligible_records()
