@@ -1,0 +1,164 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: archiver-cronjob
+  namespace: audit-archiver
+  labels:
+    app: audit-archiver
+    component: archiver
+    job-type: archive
+spec:
+  # Schedule: Run daily at 2:00 AM UTC
+  # Format: minute hour day-of-month month day-of-week
+  # Examples:
+  #   "0 2 * * *"     - Daily at 2 AM
+  #   "0 */6 * * *"   - Every 6 hours
+  #   "0 2 * * 0"     - Every Sunday at 2 AM
+  #   "0 2 1 * *"     - First day of month at 2 AM
+  schedule: "0 2 * * *"
+  
+  # Timezone (Kubernetes 1.27+)
+  # timeZone: "America/New_York"
+  
+  # Concurrency policy: Allow/Forbid/Replace
+  # Allow: Multiple jobs can run concurrently
+  # Forbid: Skip if previous job still running
+  # Replace: Cancel previous job and start new one
+  concurrencyPolicy: Forbid
+  
+  # Successful jobs history: Keep last 3 successful jobs
+  successfulJobsHistoryLimit: 3
+  
+  # Failed jobs history: Keep last 1 failed job for debugging
+  failedJobsHistoryLimit: 1
+  
+  # Job template
+  jobTemplate:
+    spec:
+      # Active deadline: Kill job after 4 hours (safety limit)
+      activeDeadlineSeconds: 14400  # 4 hours
+      
+      # Backoff limit: Retry failed pods up to 2 times
+      backoffLimit: 2
+      
+      # TTL for completed jobs: Delete after 24 hours
+      ttlSecondsAfterFinished: 86400
+      
+      template:
+        metadata:
+          labels:
+            app: audit-archiver
+            component: archiver
+            job-type: archive
+        spec:
+          serviceAccountName: archiver-serviceaccount
+          
+          # Restart policy: Never (CronJob should not restart)
+          restartPolicy: Never
+          
+          # Security context: Run as non-root user
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          
+          containers:
+            - name: archiver
+              # UPDATE THIS with your container image
+              # Use the image from GitHub Container Registry:
+              # image: ghcr.io/YOUR_ORG/YOUR_REPO:latest
+              # Or from Docker Hub:
+              # image: your-org/audit-archiver:latest
+              image: ghcr.io/labsbykora/audit_table_archiver:latest
+              
+              imagePullPolicy: IfNotPresent
+              
+              # Command and args
+              command:
+                - python
+                - -m
+                - archiver.main
+              args:
+                - --config
+                - /app/config/config.yaml
+                # Optional: Add --verbose for detailed logging
+                # - --verbose
+                # Optional: Process specific database/table
+                # - --database
+                # - production_db
+                # - --table
+                # - audit_logs
+              
+              # Environment variables from Secret
+              env:
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: archiver-secrets
+                      key: DB_PASSWORD
+                
+                # S3 credentials (only if not using IAM roles)
+                # Uncomment if using access keys instead of IAM:
+                # - name: AWS_ACCESS_KEY_ID
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: archiver-secrets
+                #       key: AWS_ACCESS_KEY_ID
+                # - name: AWS_SECRET_ACCESS_KEY
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: archiver-secrets
+                #       key: AWS_SECRET_ACCESS_KEY
+                
+                # AWS region (if not in config)
+                - name: AWS_DEFAULT_REGION
+                  value: "us-east-1"  # UPDATE THIS
+                
+                # Logging
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+                - name: LOG_LEVEL
+                  value: "INFO"  # DEBUG, INFO, WARNING, ERROR
+              
+              # Mount ConfigMap as volume
+              volumeMounts:
+                - name: config
+                  mountPath: /app/config
+                  readOnly: true
+              
+              # Resource limits and requests
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "500m"
+                limits:
+                  memory: "2Gi"
+                  cpu: "2000m"
+              
+              # Liveness probe (optional, for long-running jobs)
+              # livenessProbe:
+              #   exec:
+              #     command:
+              #       - /bin/sh
+              #       - -c
+              #       - "ps aux | grep '[p]ython.*archiver.main' || exit 1"
+              #   initialDelaySeconds: 60
+              #   periodSeconds: 30
+              #   timeoutSeconds: 10
+              #   failureThreshold: 3
+              
+              # Readiness probe (optional)
+              # readinessProbe:
+              #   exec:
+              #     command:
+              #       - /bin/sh
+              #       - -c
+              #       - "test -f /tmp/archiver.ready || exit 1"
+              #   initialDelaySeconds: 30
+              #   periodSeconds: 10
+          
+          volumes:
+            - name: config
+              configMap:
+                name: archiver-config
+

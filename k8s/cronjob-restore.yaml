@@ -1,0 +1,126 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: archiver-restore-cronjob
+  namespace: audit-archiver
+  labels:
+    app: audit-archiver
+    component: restore
+    job-type: restore
+spec:
+  # Schedule: Disabled by default (run manually when needed)
+  # Uncomment and set schedule if you want automated restores
+  # Examples:
+  #   "0 3 * * 0"     - Every Sunday at 3 AM (weekly restore test)
+  #   "0 0 1 * *"     - First day of month at midnight (monthly restore)
+  # schedule: "0 3 * * 0"  # Uncomment to enable
+  
+  # Set to suspend: true to disable without deleting
+  suspend: true  # Set to false to enable
+  
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 14400  # 4 hours
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      
+      template:
+        metadata:
+          labels:
+            app: audit-archiver
+            component: restore
+            job-type: restore
+        spec:
+          serviceAccountName: archiver-serviceaccount
+          restartPolicy: Never
+          
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          
+          containers:
+            - name: restore
+              # UPDATE THIS with your container image
+              image: ghcr.io/labsbykora/audit_table_archiver:latest
+              imagePullPolicy: IfNotPresent
+              
+              command:
+                - python
+                - -m
+                - restore.main
+              args:
+                - --config
+                - /app/config/config.yaml
+                # Restore options (choose one):
+                # Option 1: Restore specific S3 key
+                # - --s3-key
+                # - "archives/db/table/year=2026/month=01/day=04/file.jsonl.gz"
+                
+                # Option 2: Restore all batches for a table
+                # - --restore-all
+                # - --database
+                # - production_db
+                # - --table
+                # - audit_logs
+                
+                # Option 3: Restore with date range
+                # - --restore-all
+                # - --database
+                # - production_db
+                # - --table
+                # - audit_logs
+                # - --start-date
+                # - "2026-01-01"
+                # - --end-date
+                # - "2026-01-31"
+              
+              env:
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: archiver-secrets
+                      key: DB_PASSWORD
+                
+                # S3 credentials (only if not using IAM roles)
+                # - name: AWS_ACCESS_KEY_ID
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: archiver-secrets
+                #       key: AWS_ACCESS_KEY_ID
+                # - name: AWS_SECRET_ACCESS_KEY
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: archiver-secrets
+                #       key: AWS_SECRET_ACCESS_KEY
+                
+                - name: AWS_DEFAULT_REGION
+                  value: "us-east-1"  # UPDATE THIS
+                
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+                - name: LOG_LEVEL
+                  value: "INFO"
+              
+              volumeMounts:
+                - name: config
+                  mountPath: /app/config
+                  readOnly: true
+              
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "500m"
+                limits:
+                  memory: "2Gi"
+                  cpu: "2000m"
+          
+          volumes:
+            - name: config
+              configMap:
+                name: archiver-config
+
