@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.11", "3.12"]
 
     services:
       postgres:
@@ -75,14 +75,9 @@ jobs:
       run: |
         mypy src/ || true  # Allow failures for now
 
-    - name: Normalize line endings
-      run: |
-        # Ensure all Python files have LF endings (handles any CRLF in repo)
-        git config core.autocrlf input
-        find . -name '*.py' -exec sed -i 's/\r$//' {} +
-
     - name: Format check with black
       run: |
+        black --version
         black --check .
 
     - name: Run unit tests
