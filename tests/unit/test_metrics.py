@@ -14,7 +14,7 @@ def clear_registry():
     collectors_to_remove = [
         collector
         for collector in list(REGISTRY._collector_to_names.keys())
-        if hasattr(collector, '_name') and collector._name.startswith('archiver_')
+        if hasattr(collector, "_name") and collector._name.startswith("archiver_")
     ]
     for collector in collectors_to_remove:
         REGISTRY.unregister(collector)
@@ -262,4 +262,3 @@ class TestArchiverMetrics:
             )
 
         assert True  # Verify no exception
-

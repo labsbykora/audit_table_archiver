@@ -67,6 +67,7 @@ class S3Client:
         # Local fallback if configured
         if self.config.local_fallback_dir:
             from pathlib import Path
+
             self._local_fallback = LocalFallback(
                 fallback_dir=Path(self.config.local_fallback_dir),
                 retention_days=self.config.local_fallback_retention_days,
@@ -130,6 +131,7 @@ class S3Client:
             # Use a valid object name (MinIO has stricter naming rules than AWS S3)
             # Avoid leading dots and use alphanumeric characters
             import time
+
             timestamp = int(time.time())
             test_key = f"{self.config.prefix}test_write_permission_{timestamp}.tmp"
             # Remove leading slash if prefix already has one
@@ -613,11 +615,13 @@ class S3Client:
             for page in page_iterator:
                 if "Contents" in page:
                     for obj in page["Contents"]:
-                        objects.append({
-                            "key": obj["Key"],
-                            "last_modified": obj["LastModified"],
-                            "size": obj.get("Size", 0),
-                        })
+                        objects.append(
+                            {
+                                "key": obj["Key"],
+                                "last_modified": obj["LastModified"],
+                                "size": obj.get("Size", 0),
+                            }
+                        )
 
                 # Stop if we've reached max_keys
                 if max_keys and len(objects) >= max_keys:
@@ -650,4 +654,3 @@ class S3Client:
                     "prefix": full_prefix,
                 },
             ) from e
-

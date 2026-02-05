@@ -181,4 +181,3 @@ def test_object_exists_false(mock_session: MagicMock, s3_config: S3Config) -> No
 
     result = client.object_exists("nonexistent-key.jsonl.gz")
     assert result is False
-

@@ -163,9 +163,7 @@ class CostEstimator:
 
         # Calculate monthly costs
         monthly_storage_cost = compressed_size_gb * storage_price
-        monthly_retrieval_cost = (
-            compressed_size_gb * retrieval_percentage * retrieval_price
-        )
+        monthly_retrieval_cost = compressed_size_gb * retrieval_percentage * retrieval_price
         monthly_total_cost = monthly_storage_cost + monthly_retrieval_cost
 
         # Calculate annual costs
@@ -260,4 +258,3 @@ class CostEstimator:
             comparisons[storage_class.value] = estimate
 
         return comparisons
-

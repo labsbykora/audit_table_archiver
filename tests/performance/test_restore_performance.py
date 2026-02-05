@@ -19,13 +19,15 @@ def large_archive() -> ArchiveFile:
     # Generate 10,000 records
     records = []
     for i in range(10000):
-        records.append({
-            "id": i,
-            "name": f"test_{i}",
-            "created_at": "2026-01-01T00:00:00Z",
-            "amount": f"{i * 0.01:.2f}",
-            "active": i % 2 == 0,
-        })
+        records.append(
+            {
+                "id": i,
+                "name": f"test_{i}",
+                "created_at": "2026-01-01T00:00:00Z",
+                "amount": f"{i * 0.01:.2f}",
+                "active": i % 2 == 0,
+            }
+        )
 
     jsonl_data = "\n".join(json.dumps(r) for r in records).encode("utf-8")
     compressed_data = gzip.compress(jsonl_data)
@@ -132,10 +134,15 @@ class TestRestorePerformance:
 
         # Mock connection
         mock_conn = MagicMock()
-        mock_conn.fetch = AsyncMock(return_value=[
-            {"indexname": "idx_name", "indexdef": "CREATE INDEX idx_name ON table(name)"},
-            {"indexname": "idx_created", "indexdef": "CREATE INDEX idx_created ON table(created_at)"},
-        ])
+        mock_conn.fetch = AsyncMock(
+            return_value=[
+                {"indexname": "idx_name", "indexdef": "CREATE INDEX idx_name ON table(name)"},
+                {
+                    "indexname": "idx_created",
+                    "indexdef": "CREATE INDEX idx_created ON table(created_at)",
+                },
+            ]
+        )
         mock_conn.execute = AsyncMock()
         mock_conn.executemany = AsyncMock(return_value="INSERT 0 1000")
         mock_conn.transaction = MagicMock()
@@ -355,8 +362,10 @@ class TestRestorePerformance:
 
         # Verify executemany was used (not individual executes)
         assert mock_conn.executemany.called
-        assert not mock_conn.execute.called or mock_conn.execute.call_count < mock_conn.executemany.call_count
+        assert (
+            not mock_conn.execute.called
+            or mock_conn.execute.call_count < mock_conn.executemany.call_count
+        )
 
         # Verify batches were processed
         assert mock_conn.executemany.call_count > 0
-

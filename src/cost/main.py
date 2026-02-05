@@ -158,7 +158,9 @@ def main(
                         f"Table: {db.name}.{table.schema_name}.{table.name} "
                         f"(retention: {table.retention_days or archiver_config.defaults.retention_days} days)"
                     )
-                    click.echo("  Note: Actual size depends on data. Use --size-gb for precise estimates.\n")
+                    click.echo(
+                        "  Note: Actual size depends on data. Use --size-gb for precise estimates.\n"
+                    )
 
             # Use S3 config from archiver config
 
@@ -205,9 +207,7 @@ def main(
             if output_format == "json":
                 import json
 
-                result = {
-                    sc: est.to_dict() for sc, est in comparisons.items()
-                }
+                result = {sc: est.to_dict() for sc, est in comparisons.items()}
                 click.echo(json.dumps(result, indent=2))
             else:
                 from utils.output import print_header, print_key_value, print_section, print_table
@@ -220,11 +220,13 @@ def main(
                 for sc_name, estimate in sorted(
                     comparisons.items(), key=lambda x: x[1].annual_total_cost
                 ):
-                    rows.append([
-                        sc_name,
-                        f"${estimate.monthly_total_cost:,.2f}",
-                        f"${estimate.annual_total_cost:,.2f}"
-                    ])
+                    rows.append(
+                        [
+                            sc_name,
+                            f"${estimate.monthly_total_cost:,.2f}",
+                            f"${estimate.annual_total_cost:,.2f}",
+                        ]
+                    )
                 print_table(headers, rows)
                 click.echo()
         else:
@@ -255,8 +257,12 @@ def main(
                 print_key_value("Monthly Storage", f"${estimate.monthly_storage_cost:,.2f}")
                 if estimate.monthly_retrieval_cost > 0:
                     print_key_value("Monthly Retrieval", f"${estimate.monthly_retrieval_cost:,.2f}")
-                print_key_value("Monthly Total", f"${estimate.monthly_total_cost:,.2f}", value_color="green")
-                print_key_value("Annual Total", f"${estimate.annual_total_cost:,.2f}", value_color="green")
+                print_key_value(
+                    "Monthly Total", f"${estimate.monthly_total_cost:,.2f}", value_color="green"
+                )
+                print_key_value(
+                    "Annual Total", f"${estimate.annual_total_cost:,.2f}", value_color="green"
+                )
                 click.echo()
 
     except KeyboardInterrupt:
@@ -272,4 +278,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-

@@ -96,7 +96,9 @@ class RestoreWatermarkManager:
             logger: Optional logger instance
         """
         if storage_type not in ("s3", "database", "both"):
-            raise ValueError(f"Invalid storage_type: {storage_type}. Must be 's3', 'database', or 'both'")
+            raise ValueError(
+                f"Invalid storage_type: {storage_type}. Must be 's3', 'database', or 'both'"
+            )
 
         self.storage_type = storage_type
         self.logger = logger or get_logger("restore_watermark_manager")
@@ -370,7 +372,9 @@ class RestoreWatermarkManager:
             watermark_key = f"{prefix}/{watermark_key}"
 
         # Write to temporary file and upload
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".json", encoding="utf-8"
+        ) as tmp_file:
             tmp_path = Path(tmp_file.name)
             tmp_file.write(watermark_json)
 
@@ -518,4 +522,3 @@ class RestoreWatermarkManager:
                     "table": watermark.table_name,
                 },
             ) from e
-

@@ -74,4 +74,3 @@ def get_logger(name: Optional[str] = None) -> structlog.BoundLogger:
     if name:
         return structlog.get_logger(name)
     return structlog.get_logger()
-

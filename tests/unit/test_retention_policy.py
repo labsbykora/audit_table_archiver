@@ -189,4 +189,3 @@ class TestRetentionPolicyEnforcer:
 
         # Should not raise exception
         enforcer.validate_retention(table_config)
-

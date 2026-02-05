@@ -94,7 +94,9 @@ class ConfigWizard:
                         LIMIT 1
                     """
                     pk_row = await conn.fetchrow(pk_query, schema, table_name)
-                    primary_key = pk_row["column_name"] if pk_row else (id_cols[0] if id_cols else None)
+                    primary_key = (
+                        pk_row["column_name"] if pk_row else (id_cols[0] if id_cols else None)
+                    )
 
                     # Suggest timestamp column (prefer 'created_at', 'updated_at', 'timestamp')
                     suggested_timestamp = None
@@ -105,14 +107,16 @@ class ConfigWizard:
                     if not suggested_timestamp and timestamp_cols:
                         suggested_timestamp = timestamp_cols[0]
 
-                    tables.append({
-                        "name": table_name,
-                        "schema": schema,
-                        "timestamp_columns": timestamp_cols,
-                        "suggested_timestamp": suggested_timestamp,
-                        "id_columns": id_cols,
-                        "primary_key": primary_key,
-                    })
+                    tables.append(
+                        {
+                            "name": table_name,
+                            "schema": schema,
+                            "timestamp_columns": timestamp_cols,
+                            "suggested_timestamp": suggested_timestamp,
+                            "id_columns": id_cols,
+                            "primary_key": primary_key,
+                        }
+                    )
 
                 self.logger.debug("Tables detected", database=database, count=len(tables))
                 return tables
@@ -172,9 +176,7 @@ class ConfigWizard:
 
             try:
                 # Get total record count
-                total_count = await conn.fetchval(
-                    f'SELECT COUNT(*) FROM "{schema}"."{table}"'
-                )
+                total_count = await conn.fetchval(f'SELECT COUNT(*) FROM "{schema}"."{table}"')
 
                 # Get count of records older than retention period
                 cutoff_query = f"""
@@ -301,4 +303,3 @@ class ConfigWizard:
             return 5000
         else:
             return 10000
-

@@ -1,6 +1,5 @@
 """Integration tests for Phase 4: Cost estimation."""
 
-
 import pytest
 
 from cost.cost_estimator import CostEstimator, StorageClass
@@ -97,4 +96,3 @@ def test_cost_estimation_region_variation():
 
     # EU should be slightly more expensive
     assert estimate_eu.monthly_storage_cost >= estimate_us.monthly_storage_cost
-

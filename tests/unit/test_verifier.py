@@ -38,9 +38,7 @@ def test_verify_counts_with_context() -> None:
     """Test count verification with context."""
     verifier = Verifier()
     context = {"database": "test_db", "table": "test_table"}
-    verifier.verify_counts(
-        db_count=50, memory_count=50, s3_count=50, context=context
-    )
+    verifier.verify_counts(db_count=50, memory_count=50, s3_count=50, context=context)
 
 
 def test_verify_primary_keys_match() -> None:
@@ -92,4 +90,3 @@ def test_verify_primary_keys_with_context() -> None:
     verifier = Verifier()
     context = {"batch": 1}
     verifier.verify_primary_keys([1, 2, 3], [1, 2, 3], context=context)
-

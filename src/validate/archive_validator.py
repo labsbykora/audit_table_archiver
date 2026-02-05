@@ -112,7 +112,9 @@ class ValidationResult:
         if self.errors:
             lines.append(f"\nErrors ({len(self.errors)}):")
             for error in self.errors[:5]:
-                lines.append(f"  - {error.get('file', 'unknown')}: {error.get('error', 'unknown error')}")
+                lines.append(
+                    f"  - {error.get('file', 'unknown')}: {error.get('error', 'unknown error')}"
+                )
             if len(self.errors) > 5:
                 lines.append(f"  ... and {len(self.errors) - 5} more errors")
 
@@ -164,9 +166,7 @@ class ArchiveValidator:
 
         try:
             # Read archive (this validates checksums if enabled)
-            archive = await self.s3_reader.read_archive(
-                s3_key, validate_checksum=validate_checksum
-            )
+            archive = await self.s3_reader.read_archive(s3_key, validate_checksum=validate_checksum)
 
             # Validate record count if requested
             if validate_record_count:
@@ -393,4 +393,3 @@ class ArchiveValidator:
         # on data files missing metadata.
 
         return orphaned
-

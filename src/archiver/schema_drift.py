@@ -97,11 +97,13 @@ class SchemaDriftDetector:
 
                 # Compare data type
                 if current_col.get("data_type") != previous_col.get("data_type"):
-                    column_type_changes.append({
-                        "column": col_name,
-                        "previous_type": previous_col.get("data_type"),
-                        "current_type": current_col.get("data_type"),
-                    })
+                    column_type_changes.append(
+                        {
+                            "column": col_name,
+                            "previous_type": previous_col.get("data_type"),
+                            "current_type": current_col.get("data_type"),
+                        }
+                    )
                     changes.append(
                         f"Column type changed: {col_name} "
                         f"({previous_col.get('data_type')} -> {current_col.get('data_type')})"
@@ -119,14 +121,14 @@ class SchemaDriftDetector:
         previous_pk = previous_schema.get("primary_key")
 
         if current_pk != previous_pk:
-            constraint_changes.append({
-                "type": "primary_key",
-                "previous": previous_pk,
-                "current": current_pk,
-            })
-            changes.append(
-                f"Primary key changed: {previous_pk} -> {current_pk}"
+            constraint_changes.append(
+                {
+                    "type": "primary_key",
+                    "previous": previous_pk,
+                    "current": current_pk,
+                }
             )
+            changes.append(f"Primary key changed: {previous_pk} -> {current_pk}")
 
         # Compare foreign keys
         current_fks = {fk["constraint_name"]: fk for fk in current_schema.get("foreign_keys", [])}
@@ -135,20 +137,24 @@ class SchemaDriftDetector:
         # Find added/removed foreign keys
         for fk_name in current_fks:
             if fk_name not in previous_fks:
-                constraint_changes.append({
-                    "type": "foreign_key_added",
-                    "constraint": fk_name,
-                    "details": current_fks[fk_name],
-                })
+                constraint_changes.append(
+                    {
+                        "type": "foreign_key_added",
+                        "constraint": fk_name,
+                        "details": current_fks[fk_name],
+                    }
+                )
                 changes.append(f"Foreign key added: {fk_name}")
 
         for fk_name in previous_fks:
             if fk_name not in current_fks:
-                constraint_changes.append({
-                    "type": "foreign_key_removed",
-                    "constraint": fk_name,
-                    "details": previous_fks[fk_name],
-                })
+                constraint_changes.append(
+                    {
+                        "type": "foreign_key_removed",
+                        "constraint": fk_name,
+                        "details": previous_fks[fk_name],
+                    }
+                )
                 changes.append(f"Foreign key removed: {fk_name}")
 
         # Compare indexes
@@ -208,4 +214,3 @@ class SchemaDriftDetector:
             )
 
         return drift_info
-

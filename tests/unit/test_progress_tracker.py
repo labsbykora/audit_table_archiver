@@ -269,4 +269,3 @@ class TestProgressTracker:
         )
 
         assert True  # Verify no exception
-

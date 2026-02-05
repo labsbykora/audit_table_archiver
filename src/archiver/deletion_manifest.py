@@ -141,4 +141,3 @@ class DeletionManifestGenerator:
             key_count=len(manifest_keys),
         )
         return True
-

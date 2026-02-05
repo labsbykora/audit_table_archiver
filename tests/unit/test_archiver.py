@@ -219,18 +219,21 @@ async def test_archiver_load_previous_schema(archiver: Archiver) -> None:
     metadata_json = json.dumps(mock_metadata)
     metadata_bytes = metadata_json.encode("utf-8")
 
-    mock_s3_client.list_objects = MagicMock(return_value=[
-        {
-            "key": "test_db/test_table/year=2024/month=01/day=01/batch_1.metadata.json",
-            "last_modified": datetime.now(timezone.utc),
-        }
-    ])
+    mock_s3_client.list_objects = MagicMock(
+        return_value=[
+            {
+                "key": "test_db/test_table/year=2024/month=01/day=01/batch_1.metadata.json",
+                "last_modified": datetime.now(timezone.utc),
+            }
+        ]
+    )
     mock_s3_client.get_object_bytes = MagicMock(return_value=metadata_bytes)
 
     # Mock metadata_from_json
-    with patch.object(archiver.metadata_generator, "metadata_from_json", return_value=mock_metadata):
+    with patch.object(
+        archiver.metadata_generator, "metadata_from_json", return_value=mock_metadata
+    ):
         schema = await archiver._load_previous_schema(mock_s3_client, "test_db", "test_table")
         assert schema is not None
         assert "columns" in schema
         assert "primary_key" in schema
-

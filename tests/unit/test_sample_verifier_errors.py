@@ -104,9 +104,7 @@ async def test_verify_samples_not_in_database_found(
 ) -> None:
     """Test verify_samples_not_in_database when samples are found."""
     # Simulate finding some samples in database
-    mock_db_manager.fetch = AsyncMock(
-        return_value=[{"id": 1}, {"id": 2}]  # Found 2 of 3 samples
-    )
+    mock_db_manager.fetch = AsyncMock(return_value=[{"id": 1}, {"id": 2}])  # Found 2 of 3 samples
 
     with pytest.raises(VerificationError, match="Sample verification failed"):
         await verifier.verify_samples_not_in_database(
@@ -120,9 +118,7 @@ async def test_verify_samples_not_in_database_no_samples(
 ) -> None:
     """Test verify_samples_not_in_database with no samples."""
     # Should not raise, just log warning
-    await verifier.verify_samples_not_in_database(
-        mock_db_manager, "public", "test_table", "id", []
-    )
+    await verifier.verify_samples_not_in_database(mock_db_manager, "public", "test_table", "id", [])
 
 
 @pytest.mark.asyncio
@@ -149,4 +145,3 @@ async def test_verify_samples_not_in_database_success(
     await verifier.verify_samples_not_in_database(
         mock_db_manager, "public", "test_table", "id", [1, 2, 3]
     )
-

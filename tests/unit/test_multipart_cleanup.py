@@ -32,7 +32,9 @@ def cleanup(mock_s3_client: MagicMock) -> MultipartCleanup:
 
 
 @pytest.mark.asyncio
-async def test_list_orphaned_uploads_success(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_list_orphaned_uploads_success(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test successful listing of orphaned uploads."""
     # Create mock paginator
     mock_paginator = MagicMock()
@@ -71,7 +73,9 @@ async def test_list_orphaned_uploads_success(cleanup: MultipartCleanup, mock_s3_
 
 
 @pytest.mark.asyncio
-async def test_list_orphaned_uploads_with_prefix(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_list_orphaned_uploads_with_prefix(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test listing with prefix filter."""
     mock_paginator = MagicMock()
     stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
@@ -106,7 +110,9 @@ async def test_list_orphaned_uploads_with_prefix(cleanup: MultipartCleanup, mock
 
 
 @pytest.mark.asyncio
-async def test_list_orphaned_uploads_client_error(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_list_orphaned_uploads_client_error(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test listing with S3 client error."""
     mock_s3_client.client.get_paginator.side_effect = ClientError(
         {"Error": {"Code": "AccessDenied", "Message": "Access denied"}},
@@ -118,7 +124,9 @@ async def test_list_orphaned_uploads_client_error(cleanup: MultipartCleanup, moc
 
 
 @pytest.mark.asyncio
-async def test_list_orphaned_uploads_invalid_timestamp(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_list_orphaned_uploads_invalid_timestamp(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test listing with invalid timestamp."""
     mock_paginator = MagicMock()
     mock_page_iterator = MagicMock()
@@ -180,7 +188,9 @@ async def test_abort_upload_error(cleanup: MultipartCleanup, mock_s3_client: Mag
 
 
 @pytest.mark.asyncio
-async def test_cleanup_orphaned_uploads_dry_run(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_cleanup_orphaned_uploads_dry_run(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test cleanup in dry-run mode."""
     stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
 
@@ -210,7 +220,9 @@ async def test_cleanup_orphaned_uploads_dry_run(cleanup: MultipartCleanup, mock_
 
 
 @pytest.mark.asyncio
-async def test_cleanup_orphaned_uploads_with_failures(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_cleanup_orphaned_uploads_with_failures(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test cleanup with some failures."""
     stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
 
@@ -257,7 +269,9 @@ async def test_cleanup_orphaned_uploads_with_failures(cleanup: MultipartCleanup,
 
 
 @pytest.mark.asyncio
-async def test_cleanup_for_database_table(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_cleanup_for_database_table(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test cleanup for specific database/table."""
     with patch.object(cleanup, "cleanup_orphaned_uploads", new_callable=AsyncMock) as mock_cleanup:
         mock_cleanup.return_value = {"total_found": 0, "aborted": 0, "failed": 0, "errors": []}
@@ -269,7 +283,9 @@ async def test_cleanup_for_database_table(cleanup: MultipartCleanup, mock_s3_cli
 
 
 @pytest.mark.asyncio
-async def test_list_orphaned_uploads_with_max_age(cleanup: MultipartCleanup, mock_s3_client: MagicMock) -> None:
+async def test_list_orphaned_uploads_with_max_age(
+    cleanup: MultipartCleanup, mock_s3_client: MagicMock
+) -> None:
     """Test listing with custom max_age_hours."""
     mock_paginator = MagicMock()
     old_time = datetime.now(timezone.utc) - timedelta(hours=50)

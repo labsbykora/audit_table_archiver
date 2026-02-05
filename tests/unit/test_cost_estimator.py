@@ -1,6 +1,5 @@
 """Unit tests for cost estimation module."""
 
-
 import pytest
 
 from cost.cost_estimator import CostEstimate, CostEstimator, StorageClass
@@ -190,4 +189,3 @@ class TestCostEstimator:
         deep_archive_cost = comparisons["DEEP_ARCHIVE"].annual_total_cost
         standard_cost = comparisons["STANDARD"].annual_total_cost
         assert deep_archive_cost < standard_cost
-

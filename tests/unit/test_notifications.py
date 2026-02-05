@@ -358,4 +358,3 @@ class TestNotificationManager:
         await manager.close()
 
         mock_channel1.close_session.assert_called_once()
-

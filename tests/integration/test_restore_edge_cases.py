@@ -272,4 +272,3 @@ async def test_restore_corrupted_archive(
 
     # Cleanup
     tmp_file_path.unlink()
-

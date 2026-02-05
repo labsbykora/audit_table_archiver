@@ -15,9 +15,7 @@ from archiver.s3_client import S3Client
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_empty_table_handling(
-    archiver_config: ArchiverConfig, db_connection
-) -> None:
+async def test_empty_table_handling(archiver_config: ArchiverConfig, db_connection) -> None:
     """Test archiver handles empty tables gracefully."""
     # Create empty table
     empty_table = "empty_audit_logs"
@@ -143,7 +141,7 @@ async def test_special_characters_in_data(
     # Note: Null byte (\x00) cannot be stored in PostgreSQL TEXT columns (UTF8 encoding)
     special_data = [
         ("test' OR '1'='1", "SQL injection attempt"),
-        ("test\"quote", "Double quote"),
+        ('test"quote', "Double quote"),
         ("test\nnewline", "Newline"),
         ("test\ttab", "Tab"),
         # Skip null byte - PostgreSQL TEXT doesn't support it
@@ -247,9 +245,7 @@ async def test_database_connection_failure_mid_operation(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_invalid_s3_bucket(
-    archiver_config: ArchiverConfig, test_table: str
-) -> None:
+async def test_invalid_s3_bucket(archiver_config: ArchiverConfig, test_table: str) -> None:
     """Test that invalid S3 bucket configuration is caught early."""
     # Set invalid bucket and ensure S3 credentials are set
     archiver_config.s3.bucket = "nonexistent-bucket-12345"
@@ -292,10 +288,7 @@ async def test_large_batch_handling(
         INSERT INTO {test_table} (user_id, action, metadata, created_at)
         VALUES ($1, $2, $3::jsonb, NOW() - INTERVAL '100 days')
         """,
-        [
-            (i, f"action_{i}", json.dumps({"key": f"value_{i}"}))
-            for i in range(1000)
-        ],
+        [(i, f"action_{i}", json.dumps({"key": f"value_{i}"})) for i in range(1000)],
     )
 
     archiver_config.databases[0].tables[0].name = test_table
@@ -344,6 +337,7 @@ async def test_primary_key_verification_failure(
 
     # Get initial count
     import asyncpg
+
     conn = await asyncpg.connect(
         host="localhost",
         port=5432,
@@ -427,9 +421,7 @@ async def test_dry_run_no_changes(
         aws_secret_access_key="minioadmin",
     )
 
-    _ = s3.list_objects_v2(
-        Bucket="test-archives", Prefix=f"test_db/{test_table}/"
-    )
+    _ = s3.list_objects_v2(Bucket="test-archives", Prefix=f"test_db/{test_table}/")
     # Should have no new files from this test (or count existing ones)
     # We can't assert zero because other tests may have created files
     # But we can verify the count didn't increase (would need setup for that)
@@ -454,4 +446,3 @@ async def test_transaction_timeout_handling(
     # Should complete successfully
     stats = await archiver.archive()
     assert stats["databases_processed"] >= 0
-

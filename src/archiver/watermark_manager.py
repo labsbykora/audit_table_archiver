@@ -57,9 +57,7 @@ class WatermarkManager:
         else:  # database
             if db_manager is None:
                 raise ValueError("db_manager is required for database storage type")
-            return await self._load_watermark_from_database(
-                db_manager, database_name, table_name
-            )
+            return await self._load_watermark_from_database(db_manager, database_name, table_name)
 
     async def save_watermark(
         self,
@@ -174,7 +172,9 @@ class WatermarkManager:
         watermark_key = f"{database_name}/{table_name}/.watermark.json"
 
         # Write to temporary file and upload
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".json", encoding="utf-8"
+        ) as tmp_file:
             tmp_path = Path(tmp_file.name)
             tmp_file.write(watermark_json)
 
@@ -315,4 +315,3 @@ class WatermarkManager:
                     "table": table_name,
                 },
             ) from e
-

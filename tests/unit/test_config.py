@@ -187,4 +187,3 @@ def test_load_config_invalid_yaml() -> None:
             load_config(config_path)
     finally:
         config_path.unlink()
-

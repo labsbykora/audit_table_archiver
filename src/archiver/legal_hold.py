@@ -207,9 +207,7 @@ class LegalHoldChecker:
             expiration_date = row.get("expiration_date")
             if expiration_date and isinstance(expiration_date, str):
                 try:
-                    expiration_date = datetime.fromisoformat(
-                        expiration_date.replace("Z", "+00:00")
-                    )
+                    expiration_date = datetime.fromisoformat(expiration_date.replace("Z", "+00:00"))
                 except Exception:
                     expiration_date = None
 
@@ -217,9 +215,7 @@ class LegalHoldChecker:
             start_date = row.get("start_date")
             if isinstance(start_date, str):
                 try:
-                    start_date = datetime.fromisoformat(
-                        start_date.replace("Z", "+00:00")
-                    )
+                    start_date = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
                 except Exception:
                     start_date = datetime.now(timezone.utc)
             elif start_date is None:
@@ -290,7 +286,9 @@ class LegalHoldChecker:
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=self.api_timeout)) as response:
+                async with session.get(
+                    url, timeout=aiohttp.ClientTimeout(total=self.api_timeout)
+                ) as response:
                     if response.status == 404:
                         return None
 
@@ -359,4 +357,3 @@ class LegalHoldChecker:
                 error=str(e),
             )
             return None
-

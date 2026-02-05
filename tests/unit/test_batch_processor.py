@@ -219,4 +219,3 @@ def test_get_last_cursor_empty(batch_processor: BatchProcessor) -> None:
 
     assert last_timestamp is None
     assert last_pk is None
-

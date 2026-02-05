@@ -110,7 +110,9 @@ class TestS3ArchiveReader:
         with patch("restore.s3_reader.S3Client") as mock_s3_client_class:
             mock_s3_client = MagicMock()
             # get_object_bytes is synchronous, returns bytes directly
-            mock_s3_client.get_object_bytes = MagicMock(side_effect=[metadata_bytes, compressed_data])
+            mock_s3_client.get_object_bytes = MagicMock(
+                side_effect=[metadata_bytes, compressed_data]
+            )
             mock_s3_client_class.return_value = mock_s3_client
 
             reader = S3ArchiveReader(s3_config)
@@ -145,7 +147,9 @@ class TestS3ArchiveReader:
 
         with patch("restore.s3_reader.S3Client") as mock_s3_client_class:
             mock_s3_client = MagicMock()
-            mock_s3_client.get_object_bytes = MagicMock(side_effect=[metadata_bytes, compressed_data])
+            mock_s3_client.get_object_bytes = MagicMock(
+                side_effect=[metadata_bytes, compressed_data]
+            )
             mock_s3_client_class.return_value = mock_s3_client
 
             reader = S3ArchiveReader(s3_config)
@@ -166,7 +170,9 @@ class TestS3ArchiveReader:
 
         with patch("restore.s3_reader.S3Client") as mock_s3_client_class:
             mock_s3_client = MagicMock()
-            mock_s3_client.get_object_bytes = MagicMock(side_effect=[metadata_bytes, compressed_data])
+            mock_s3_client.get_object_bytes = MagicMock(
+                side_effect=[metadata_bytes, compressed_data]
+            )
             mock_s3_client_class.return_value = mock_s3_client
 
             reader = S3ArchiveReader(s3_config)
@@ -197,7 +203,9 @@ class TestS3ArchiveReader:
 
         with patch("restore.s3_reader.S3Client") as mock_s3_client_class:
             mock_s3_client = MagicMock()
-            mock_s3_client.get_object_bytes = MagicMock(side_effect=[metadata_bytes, invalid_compressed])
+            mock_s3_client.get_object_bytes = MagicMock(
+                side_effect=[metadata_bytes, invalid_compressed]
+            )
             mock_s3_client_class.return_value = mock_s3_client
 
             reader = S3ArchiveReader(s3_config)
@@ -217,7 +225,9 @@ class TestS3ArchiveReader:
         mock_objects = [
             {"Key": "archives/db/table/year=2026/month=01/day=04/file1.jsonl.gz"},
             {"Key": "archives/db/table/year=2026/month=01/day=04/file2.jsonl.gz"},
-            {"Key": "archives/db/table/year=2026/month=01/day=04/file1.metadata.json"},  # Should be filtered
+            {
+                "Key": "archives/db/table/year=2026/month=01/day=04/file1.metadata.json"
+            },  # Should be filtered
         ]
 
         with patch("restore.s3_reader.S3Client") as mock_s3_client_class:
@@ -261,4 +271,3 @@ class TestS3ArchiveReader:
 
             assert len(archives) == 1
             assert "year=2026/month=01/day=04/file1.jsonl.gz" in archives[0]
-

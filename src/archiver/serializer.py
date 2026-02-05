@@ -153,4 +153,3 @@ class SerializationError(ArchiverError):
     """Serialization-related errors."""
 
     pass
-

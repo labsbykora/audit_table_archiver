@@ -280,4 +280,3 @@ class TestLegalHoldChecker:
             )
 
             assert result is None
-

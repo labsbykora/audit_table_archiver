@@ -172,7 +172,9 @@ async def test_metadata_file_upload(s3_client, s3_config, test_table):
     metadata_json = metadata_generator.metadata_to_json(metadata)
 
     # Write to temp file and upload
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", delete=False, suffix=".json", encoding="utf-8"
+    ) as tmp_file:
         tmp_path = Path(tmp_file.name)
         tmp_file.write(metadata_json)
 
@@ -219,7 +221,9 @@ async def test_deletion_manifest_upload(s3_client, s3_config, test_table):
     manifest_json = manifest_generator.manifest_to_json(manifest)
 
     # Write to temp file and upload
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", delete=False, suffix=".json", encoding="utf-8"
+    ) as tmp_file:
         tmp_path = Path(tmp_file.name)
         tmp_file.write(manifest_json)
 
@@ -242,4 +246,3 @@ async def test_deletion_manifest_upload(s3_client, s3_config, test_table):
 
     finally:
         tmp_path.unlink()
-

@@ -54,7 +54,9 @@ class ConflictReport:
         if self.conflicts:
             lines.append("\nSample Conflicts (first 10):")
             for i, conflict in enumerate(self.conflicts[:10], 1):
-                lines.append(f"  {i}. {conflict.get('type', 'unknown')}: {conflict.get('description', 'N/A')}")
+                lines.append(
+                    f"  {i}. {conflict.get('type', 'unknown')}: {conflict.get('description', 'N/A')}"
+                )
 
         if len(self.conflicts) > 10:
             lines.append(f"\n... and {len(self.conflicts) - 10} more conflicts")
@@ -134,7 +136,9 @@ class ConflictDetector:
                         "description": f"Record with {primary_key}={pk_value} already exists",
                     }
                     conflicts.append(conflict)
-                    conflict_types["primary_key_exists"] = conflict_types.get("primary_key_exists", 0) + 1
+                    conflict_types["primary_key_exists"] = (
+                        conflict_types.get("primary_key_exists", 0) + 1
+                    )
 
             self.logger.debug(
                 "Conflict detection completed",
@@ -229,9 +233,7 @@ class ConflictResolver:
         }
 
         # Filter out conflicting records
-        filtered = [
-            record for record in records if record.get(primary_key) not in conflicting_pks
-        ]
+        filtered = [record for record in records if record.get(primary_key) not in conflicting_pks]
 
         self.logger.debug(
             "Filtered conflicting records",
@@ -272,4 +274,3 @@ class ConflictResolver:
             strategy=self.strategy,
             conflicts=conflict_report.total_conflicts,
         )
-

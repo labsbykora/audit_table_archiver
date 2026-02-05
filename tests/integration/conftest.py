@@ -38,6 +38,7 @@ def postgres_ready(docker_compose_file: Path) -> Generator[None, None, None]:
         max_attempts = 30
         for attempt in range(max_attempts):
             try:
+
                 async def check_connection():
                     conn = await asyncpg.connect(
                         host="localhost",
@@ -101,6 +102,7 @@ async def db_connection(postgres_ready: None) -> AsyncGenerator[asyncpg.Connecti
 async def test_table(db_connection: asyncpg.Connection) -> AsyncGenerator[str, None]:
     """Create test table and return table name."""
     import uuid
+
     table_name = f"test_audit_logs_{uuid.uuid4().hex[:8]}"
 
     # Create table
@@ -143,6 +145,7 @@ async def test_data(
     for i in range(1, 101):  # 100 records
         created_at = old_date + timedelta(seconds=i)
         import json
+
         await db_connection.execute(
             f"""
             INSERT INTO {test_table} (user_id, action, metadata, created_at)
@@ -255,4 +258,3 @@ def archiver_config(s3_config: S3Config) -> ArchiverConfig:
             )
         ],
     )
-

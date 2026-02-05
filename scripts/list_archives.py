@@ -58,7 +58,7 @@ def list_archives(s3_endpoint: str, s3_bucket: str, prefix: str = "archives/") -
 
                 print(f"  {key}")
                 print(f"    Size: {size_str}, Modified: {modified}")
-                print(f"    Use this exact path for restore: --s3-key \"{key}\"")
+                print(f'    Use this exact path for restore: --s3-key "{key}"')
                 print()
 
         if file_count == 0:
@@ -85,4 +85,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

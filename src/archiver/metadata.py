@@ -75,9 +75,7 @@ class MetadataGenerator:
                 "uncompressed_size_bytes": uncompressed_size,
                 "compressed_size_bytes": compressed_size,
                 "compression_ratio": (
-                    (1 - compressed_size / uncompressed_size) * 100
-                    if uncompressed_size > 0
-                    else 0
+                    (1 - compressed_size / uncompressed_size) * 100 if uncompressed_size > 0 else 0
                 ),
             },
             "checksums": {
@@ -92,16 +90,8 @@ class MetadataGenerator:
 
         if timestamp_range:
             metadata["timestamp_range"] = {
-                "min": (
-                    timestamp_range["min"].isoformat()
-                    if timestamp_range.get("min")
-                    else None
-                ),
-                "max": (
-                    timestamp_range["max"].isoformat()
-                    if timestamp_range.get("max")
-                    else None
-                ),
+                "min": (timestamp_range["min"].isoformat() if timestamp_range.get("min") else None),
+                "max": (timestamp_range["max"].isoformat() if timestamp_range.get("max") else None),
             }
 
         # Include schema information (only in first batch or if schema changed)
@@ -137,4 +127,3 @@ class MetadataGenerator:
             return json.loads(json_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid metadata JSON: {e}") from e
-

@@ -53,11 +53,13 @@ def test_main_success(runner: CliRunner, mock_config_file: Path) -> None:
     with patch("archiver.archiver.Archiver") as mock_archiver_class:
         mock_archiver = MagicMock()
         # archive() is async, so use AsyncMock
-        mock_archiver.archive = AsyncMock(return_value={
-            "databases_processed": 1,
-            "tables_processed": 1,
-            "records_archived": 100,
-        })
+        mock_archiver.archive = AsyncMock(
+            return_value={
+                "databases_processed": 1,
+                "tables_processed": 1,
+                "records_archived": 100,
+            }
+        )
         mock_archiver_class.return_value = mock_archiver
 
         result = runner.invoke(main, ["--config", str(mock_config_file), "--dry-run"])
@@ -204,4 +206,3 @@ def test_main_unexpected_error(runner: CliRunner, mock_config_file: Path) -> Non
         result = runner.invoke(main, ["--config", str(mock_config_file)])
 
         assert result.exit_code == 1
-

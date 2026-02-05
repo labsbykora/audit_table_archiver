@@ -135,17 +135,19 @@ class SchemaDetector:
 
         columns = []
         for row in rows:
-            columns.append({
-                "name": row["column_name"],
-                "data_type": row["data_type"],
-                "udt_name": row["udt_name"],  # User-defined type name
-                "character_maximum_length": row["character_maximum_length"],
-                "numeric_precision": row["numeric_precision"],
-                "numeric_scale": row["numeric_scale"],
-                "is_nullable": row["is_nullable"] == "YES",
-                "default": row["column_default"],
-                "ordinal_position": row["ordinal_position"],
-            })
+            columns.append(
+                {
+                    "name": row["column_name"],
+                    "data_type": row["data_type"],
+                    "udt_name": row["udt_name"],  # User-defined type name
+                    "character_maximum_length": row["character_maximum_length"],
+                    "numeric_precision": row["numeric_precision"],
+                    "numeric_scale": row["numeric_scale"],
+                    "is_nullable": row["is_nullable"] == "YES",
+                    "default": row["column_default"],
+                    "ordinal_position": row["ordinal_position"],
+                }
+            )
 
         return columns
 
@@ -286,12 +288,14 @@ class SchemaDetector:
 
         indexes = []
         for row in rows:
-            indexes.append({
-                "name": row["indexname"],
-                "definition": row["indexdef"],
-                "columns": row["columns"],
-                "is_unique": row["indisunique"],
-            })
+            indexes.append(
+                {
+                    "name": row["indexname"],
+                    "definition": row["indexdef"],
+                    "columns": row["columns"],
+                    "is_unique": row["indisunique"],
+                }
+            )
 
         return indexes
 
@@ -375,4 +379,3 @@ class SchemaDetector:
             }
             for row in rows
         ]
-

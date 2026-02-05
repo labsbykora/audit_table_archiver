@@ -386,5 +386,3 @@ async def test_database_load_impact(
 
     print(f"\nArchival completed: {stats['records_archived']:,} records")
     print("Verify database metrics show <5% CPU impact")
-
-

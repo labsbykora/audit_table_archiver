@@ -69,9 +69,7 @@ async def test_sequential_multi_database_processing(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_database_failure_isolation(
-    archiver_config: ArchiverConfig, test_table: str
-) -> None:
+async def test_database_failure_isolation(archiver_config: ArchiverConfig, test_table: str) -> None:
     """Test that one database failure doesn't stop processing of other databases."""
 
     # Set password environment variable
@@ -136,9 +134,7 @@ async def test_database_failure_isolation(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_per_database_statistics(
-    archiver_config: ArchiverConfig, test_table: str
-) -> None:
+async def test_per_database_statistics(archiver_config: ArchiverConfig, test_table: str) -> None:
     """Test that per-database statistics are correctly tracked."""
 
     # Set password environment variable
@@ -312,4 +308,3 @@ async def test_parallel_database_processing(
     assert len(stats["database_stats"]) == 2
     # Check that parallel processing was used (both should complete)
     assert stats["databases_processed"] + stats["databases_failed"] == 2
-

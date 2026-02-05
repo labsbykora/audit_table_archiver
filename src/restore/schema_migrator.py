@@ -35,10 +35,7 @@ class SchemaDiff:
     def has_changes(self) -> bool:
         """Check if there are any schema changes."""
         return bool(
-            self.added_columns
-            or self.removed_columns
-            or self.type_changes
-            or self.nullable_changes
+            self.added_columns or self.removed_columns or self.type_changes or self.nullable_changes
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -126,21 +123,27 @@ class SchemaMigrator:
                 archived_type = archived_col.get("data_type") or archived_col.get("type")
                 current_type = current_col.get("data_type") or current_col.get("type")
                 if archived_type != current_type:
-                    type_changes.append({
-                        "column": col_name,
-                        "archived_type": archived_type,
-                        "current_type": current_type,
-                    })
+                    type_changes.append(
+                        {
+                            "column": col_name,
+                            "archived_type": archived_type,
+                            "current_type": current_type,
+                        }
+                    )
 
                 # Check nullable changes (handle both is_nullable and nullable)
-                archived_nullable = archived_col.get("is_nullable", archived_col.get("nullable", True))
+                archived_nullable = archived_col.get(
+                    "is_nullable", archived_col.get("nullable", True)
+                )
                 current_nullable = current_col.get("is_nullable", current_col.get("nullable", True))
                 if archived_nullable != current_nullable:
-                    nullable_changes.append({
-                        "column": col_name,
-                        "archived_nullable": archived_nullable,
-                        "current_nullable": current_nullable,
-                    })
+                    nullable_changes.append(
+                        {
+                            "column": col_name,
+                            "archived_nullable": archived_nullable,
+                            "current_nullable": current_nullable,
+                        }
+                    )
 
         return SchemaDiff(
             added_columns=added_columns,
@@ -220,7 +223,10 @@ class SchemaMigrator:
             if strategy == "strict":
                 raise ArchiverError(
                     f"Cannot restore: columns removed from table: {[c['name'] for c in diff.removed_columns]}",
-                    context={"strategy": strategy, "removed_columns": [c["name"] for c in diff.removed_columns]},
+                    context={
+                        "strategy": strategy,
+                        "removed_columns": [c["name"] for c in diff.removed_columns],
+                    },
                 )
             elif strategy == "lenient":
                 # Remove columns that no longer exist
@@ -397,6 +403,7 @@ class SchemaMigrator:
                 return value
             if isinstance(value, str):
                 import json
+
                 try:
                     return json.loads(value)
                 except json.JSONDecodeError:
@@ -404,4 +411,3 @@ class SchemaMigrator:
 
         # If no conversion found, return as-is (lenient mode)
         return value
-

@@ -93,9 +93,7 @@ class CircuitBreaker:
             self._on_failure()
             raise
 
-    async def call_async(
-        self, func: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> Any:
+    async def call_async(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Call async function through circuit breaker.
 
         Args:
@@ -173,10 +171,7 @@ class CircuitBreaker:
             )
             self.state = CircuitState.OPEN
             self.success_count = 0
-        elif (
-            self.state == CircuitState.CLOSED
-            and self.failure_count >= self.failure_threshold
-        ):
+        elif self.state == CircuitState.CLOSED and self.failure_count >= self.failure_threshold:
             # Too many failures, open circuit
             self.logger.error(
                 "Circuit breaker opened due to repeated failures",
@@ -200,4 +195,3 @@ class CircuitBreaker:
             Current state
         """
         return self.state
-

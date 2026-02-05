@@ -183,7 +183,11 @@ def main(
                         {
                             "name": table["name"],
                             "schema_name": table["schema"],
-                            "timestamp_column": table["suggested_timestamp"] or table["timestamp_columns"][0] if table["timestamp_columns"] else "created_at",
+                            "timestamp_column": (
+                                table["suggested_timestamp"] or table["timestamp_columns"][0]
+                                if table["timestamp_columns"]
+                                else "created_at"
+                            ),
                             "primary_key": table["primary_key"] or "id",
                         }
                         for table in tables
@@ -215,9 +219,7 @@ def main(
             database_port = click.prompt("Database port", type=int, default=5432)
             database_name = click.prompt("Database name")
             database_user = click.prompt("Database user", default="postgres")
-            database_password = click.prompt(
-                "Database password", hide_input=True, default=""
-            )
+            database_password = click.prompt("Database password", hide_input=True, default="")
             if not database_password:
                 import os
 
@@ -264,9 +266,7 @@ def main(
                 selected_indices = list(range(len(tables)))
             else:
                 selected_indices = [
-                    int(x.strip()) - 1
-                    for x in table_indices.split(",")
-                    if x.strip().isdigit()
+                    int(x.strip()) - 1 for x in table_indices.split(",") if x.strip().isdigit()
                 ]
 
             # Configure selected tables
@@ -294,13 +294,9 @@ def main(
 
                 # Primary key
                 if table["primary_key"]:
-                    primary_key = click.prompt(
-                        "Primary key column", default=table["primary_key"]
-                    )
+                    primary_key = click.prompt("Primary key column", default=table["primary_key"])
                 elif table["id_columns"]:
-                    primary_key = click.prompt(
-                        "Primary key column", default=table["id_columns"][0]
-                    )
+                    primary_key = click.prompt("Primary key column", default=table["id_columns"][0])
                 else:
                     primary_key = click.prompt("Primary key column")
 
@@ -320,9 +316,7 @@ def main(
                         )
                     )
 
-                    click.echo(
-                        f"  Total records: {estimates['total_records']:,}"
-                    )
+                    click.echo(f"  Total records: {estimates['total_records']:,}")
                     if estimates.get("age_days"):
                         click.echo(f"  Data age: {estimates['age_days']} days")
                     if estimates.get("suggested_retention_days"):
@@ -339,13 +333,15 @@ def main(
                     "Retention period (days)", type=int, default=suggested_retention
                 )
 
-                configured_tables.append({
-                    "name": table["name"],
-                    "schema_name": table["schema"],
-                    "timestamp_column": timestamp_col,
-                    "primary_key": primary_key,
-                    "retention_days": retention_days,
-                })
+                configured_tables.append(
+                    {
+                        "name": table["name"],
+                        "schema_name": table["schema"],
+                        "timestamp_column": timestamp_col,
+                        "primary_key": primary_key,
+                        "retention_days": retention_days,
+                    }
+                )
 
             # S3 configuration
             click.echo("\nS3 Configuration:")
@@ -361,9 +357,7 @@ def main(
             default_retention = click.prompt(
                 "Default retention period (days)", type=int, default=365
             )
-            default_batch_size = click.prompt(
-                "Default batch size", type=int, default=1000
-            )
+            default_batch_size = click.prompt("Default batch size", type=int, default=1000)
 
             databases = [
                 {
@@ -427,4 +421,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-

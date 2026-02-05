@@ -64,9 +64,7 @@ async def test_load_watermark_from_s3_not_found(mock_s3_client):
     from botocore.exceptions import ClientError
 
     error_response = {"Error": {"Code": "NoSuchKey"}}
-    mock_s3_client.get_object_bytes.side_effect = ClientError(
-        error_response, "GetObject"
-    )
+    mock_s3_client.get_object_bytes.side_effect = ClientError(error_response, "GetObject")
 
     manager = WatermarkManager(storage_type="s3")
 
@@ -167,4 +165,3 @@ async def test_file_lock_watermark_storage(tmp_path):
     # Note: File-based storage is not currently implemented for watermarks
     # This test is a placeholder for future implementation
     pass
-

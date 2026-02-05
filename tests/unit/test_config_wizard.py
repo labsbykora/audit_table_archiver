@@ -27,14 +27,17 @@ class TestConfigWizard:
         class MockRecord:
             def __init__(self, data):
                 self._data = data
+
             def __getitem__(self, key):
                 return self._data[key]
 
-        mock_row = MockRecord({
-            "table_name": "audit_logs",
-            "timestamp_columns": ["created_at", "updated_at"],
-            "id_columns": ["id"],
-        })
+        mock_row = MockRecord(
+            {
+                "table_name": "audit_logs",
+                "timestamp_columns": ["created_at", "updated_at"],
+                "id_columns": ["id"],
+            }
+        )
         mock_conn.fetch = AsyncMock(return_value=[mock_row])
 
         # Mock fetchrow for primary key query
@@ -81,6 +84,7 @@ class TestConfigWizard:
         mock_conn = AsyncMock()
         # Setup fetchval to return different values for different queries
         call_count = 0
+
         async def fetchval_side_effect(query, *args):
             nonlocal call_count
             call_count += 1
@@ -182,4 +186,3 @@ class TestConfigWizard:
         batch_size = wizard.suggest_batch_size(1000000)
 
         assert batch_size == 10000
-

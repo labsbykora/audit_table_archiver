@@ -172,7 +172,9 @@ async def test_checkpoint_manager_load_from_s3(checkpoint_manager: CheckpointMan
     checkpoint_json = json.dumps(checkpoint_data)
     mock_s3_client.get_object_bytes = MagicMock(return_value=checkpoint_json.encode("utf-8"))
 
-    checkpoint = await checkpoint_manager.load_checkpoint("test_db", "test_table", s3_client=mock_s3_client)
+    checkpoint = await checkpoint_manager.load_checkpoint(
+        "test_db", "test_table", s3_client=mock_s3_client
+    )
 
     assert checkpoint is not None
     assert checkpoint.database_name == "test_db"
@@ -180,13 +182,17 @@ async def test_checkpoint_manager_load_from_s3(checkpoint_manager: CheckpointMan
 
 
 @pytest.mark.asyncio
-async def test_checkpoint_manager_load_from_s3_not_found(checkpoint_manager: CheckpointManager) -> None:
+async def test_checkpoint_manager_load_from_s3_not_found(
+    checkpoint_manager: CheckpointManager,
+) -> None:
     """Test loading checkpoint from S3 when not found."""
     mock_s3_client = MagicMock()
     mock_s3_client.config.prefix = "archives/"
     mock_s3_client.get_object_bytes = MagicMock(side_effect=S3Error("Not found"))
 
-    checkpoint = await checkpoint_manager.load_checkpoint("test_db", "test_table", s3_client=mock_s3_client)
+    checkpoint = await checkpoint_manager.load_checkpoint(
+        "test_db", "test_table", s3_client=mock_s3_client
+    )
 
     assert checkpoint is None
 
@@ -291,4 +297,3 @@ async def test_checkpoint_manager_delete_from_local(tmp_path: Path) -> None:
     await manager.delete_checkpoint("test_db", "test_table", local_path=local_path)
 
     assert not checkpoint_file.exists()
-

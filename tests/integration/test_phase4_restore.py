@@ -29,7 +29,9 @@ async def test_restore_from_archive(
 
     # test_data is already inserted by fixture, but we need it in the format we expect
     # Get the actual data from the database
-    rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
+    rows = await db_connection.fetch(
+        f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id"
+    )
 
     # Create a simple archive file in S3
     s3_config = S3Config(
@@ -41,18 +43,25 @@ async def test_restore_from_archive(
 
     # Serialize test data to JSONL
     jsonl_content = "\n".join(
-        json.dumps({
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "action": row["action"],
-            "metadata": row["metadata"],
-            "created_at": row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-        })
+        json.dumps(
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "action": row["action"],
+                "metadata": row["metadata"],
+                "created_at": (
+                    row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else str(row["created_at"])
+                ),
+            }
+        )
         for row in rows
     )
 
     # Compress and upload
     import gzip
+
     jsonl_bytes = jsonl_content.encode("utf-8")
     compressed = gzip.compress(jsonl_bytes)
 
@@ -95,7 +104,11 @@ async def test_restore_from_archive(
                     {"name": "user_id", "data_type": "integer", "is_nullable": True},
                     {"name": "action", "data_type": "text", "is_nullable": False},
                     {"name": "metadata", "data_type": "jsonb", "is_nullable": True},
-                    {"name": "created_at", "data_type": "timestamp with time zone", "is_nullable": False},
+                    {
+                        "name": "created_at",
+                        "data_type": "timestamp with time zone",
+                        "is_nullable": False,
+                    },
                 ],
                 "primary_key": {"columns": ["id"]},
             },
@@ -125,21 +138,21 @@ async def test_restore_from_archive(
 
     # Create restore engine
     db_config = DatabaseConfig(
-            name="test_db",
-            host="localhost",
-            port=5432,
-            user="archiver",
-            password_env="TEST_DB_PASSWORD",
-            tables=[
-                TableConfig(
-                    name=test_table,
-                    schema_name="public",
-                    timestamp_column="created_at",
-                    primary_key="id",
-                    retention_days=90,
-                )
-            ],
-        )
+        name="test_db",
+        host="localhost",
+        port=5432,
+        user="archiver",
+        password_env="TEST_DB_PASSWORD",
+        tables=[
+            TableConfig(
+                name=test_table,
+                schema_name="public",
+                timestamp_column="created_at",
+                primary_key="id",
+                retention_days=90,
+            )
+        ],
+    )
     db_manager = DatabaseManager(db_config)
     await db_manager.connect()
 
@@ -150,6 +163,7 @@ async def test_restore_from_archive(
 
         # Read archive first, then restore
         from restore.s3_reader import S3ArchiveReader
+
         reader = S3ArchiveReader(s3_config)
         full_s3_key = f"test/{s3_key}"  # Add prefix that was added during upload
         archive_file = await reader.read_archive(full_s3_key, validate_checksum=True)
@@ -192,11 +206,15 @@ async def test_restore_with_conflict_detection(
 ):
     """Test restore with conflict detection."""
     # Get all existing data (100 records from fixture)
-    all_rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
+    all_rows = await db_connection.fetch(
+        f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id"
+    )
 
     # Delete all but the first 2 records to simulate partial data
     # This way, when we restore all 100, only 2 will conflict
-    await db_connection.execute(f"DELETE FROM {test_table} WHERE id NOT IN (SELECT id FROM {test_table} ORDER BY id LIMIT 2)")
+    await db_connection.execute(
+        f"DELETE FROM {test_table} WHERE id NOT IN (SELECT id FROM {test_table} ORDER BY id LIMIT 2)"
+    )
 
     # Create archive with all original test data (100 records)
     s3_config = S3Config(
@@ -207,17 +225,24 @@ async def test_restore_with_conflict_detection(
     )
 
     jsonl_content = "\n".join(
-        json.dumps({
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "action": row["action"],
-            "metadata": row["metadata"],
-            "created_at": row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-        })
+        json.dumps(
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "action": row["action"],
+                "metadata": row["metadata"],
+                "created_at": (
+                    row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else str(row["created_at"])
+                ),
+            }
+        )
         for row in all_rows
     )
 
     import gzip
+
     jsonl_bytes = jsonl_content.encode("utf-8")
     compressed = gzip.compress(jsonl_bytes)
 
@@ -226,44 +251,51 @@ async def test_restore_with_conflict_detection(
 
     # Upload data file - write to temp file first
     import tempfile
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
         tmp_file.write(compressed)
         tmp_file_path = Path(tmp_file.name)
 
     try:
-        s3_key = f"test_db/public/{test_table}/year=2026/month=01/day=06/test_batch_conflict.jsonl.gz"
+        s3_key = (
+            f"test_db/public/{test_table}/year=2026/month=01/day=06/test_batch_conflict.jsonl.gz"
+        )
         s3_client.upload_file(
             file_path=tmp_file_path,
             s3_key=s3_key,
         )
 
         metadata = {
-        "batch_info": {
-            "batch_id": "test_batch_conflict",
-            "database": "test_db",
-            "schema": "public",
-            "table": test_table,
-            "archived_at": datetime.now(timezone.utc).isoformat(),
-        },
-        "data_info": {
-            "record_count": len(all_rows),
-            "total_size_bytes": len(compressed),
-            "compression": "gzip",
-        },
-        "checksums": {
-            "jsonl_sha256": checksum,
-        },
-        "schema": {
-            "columns": [
-                {"name": "id", "data_type": "bigint", "is_nullable": False},
-                {"name": "user_id", "data_type": "integer", "is_nullable": True},
-                {"name": "action", "data_type": "text", "is_nullable": False},
-                {"name": "metadata", "data_type": "jsonb", "is_nullable": True},
-                {"name": "created_at", "data_type": "timestamp with time zone", "is_nullable": False},
-            ],
-            "primary_key": {"columns": ["id"]},
-        },
-    }
+            "batch_info": {
+                "batch_id": "test_batch_conflict",
+                "database": "test_db",
+                "schema": "public",
+                "table": test_table,
+                "archived_at": datetime.now(timezone.utc).isoformat(),
+            },
+            "data_info": {
+                "record_count": len(all_rows),
+                "total_size_bytes": len(compressed),
+                "compression": "gzip",
+            },
+            "checksums": {
+                "jsonl_sha256": checksum,
+            },
+            "schema": {
+                "columns": [
+                    {"name": "id", "data_type": "bigint", "is_nullable": False},
+                    {"name": "user_id", "data_type": "integer", "is_nullable": True},
+                    {"name": "action", "data_type": "text", "is_nullable": False},
+                    {"name": "metadata", "data_type": "jsonb", "is_nullable": True},
+                    {
+                        "name": "created_at",
+                        "data_type": "timestamp with time zone",
+                        "is_nullable": False,
+                    },
+                ],
+                "primary_key": {"columns": ["id"]},
+            },
+        }
 
         metadata_key = s3_key.replace(".jsonl.gz", ".metadata.json")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w") as meta_file:
@@ -310,6 +342,7 @@ async def test_restore_with_conflict_detection(
 
         # Read archive first, then restore
         from restore.s3_reader import S3ArchiveReader
+
         reader = S3ArchiveReader(s3_config)
         full_s3_key = f"{s3_config.prefix}{s3_key}" if s3_config.prefix else s3_key
         archive_file = await reader.read_archive(full_s3_key, validate_checksum=True)
@@ -323,11 +356,15 @@ async def test_restore_with_conflict_detection(
         # Should have detected conflicts (first 2 records already exist)
         # With "skip" strategy, conflicting records are filtered out, but non-conflicting ones are restored
         assert stats["conflicts_detected"] == 2
-        assert stats["records_restored"] == len(all_rows) - 2  # 98 records restored (100 total - 2 conflicts)
+        assert (
+            stats["records_restored"] == len(all_rows) - 2
+        )  # 98 records restored (100 total - 2 conflicts)
 
         # Verify final state - with skip strategy, 2 existing + 98 restored = 100 total
         final_count = await db_connection.fetchval(f"SELECT COUNT(*) FROM {test_table}")
-        assert final_count == len(all_rows)  # All 100 records should exist (2 existing + 98 restored)
+        assert final_count == len(
+            all_rows
+        )  # All 100 records should exist (2 existing + 98 restored)
 
     finally:
         await db_manager.disconnect()
@@ -346,20 +383,29 @@ async def test_restore_s3_reader_integration(
     s3_config = s3_client.config
 
     # Get data from database
-    rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
+    rows = await db_connection.fetch(
+        f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id"
+    )
 
     jsonl_content = "\n".join(
-        json.dumps({
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "action": row["action"],
-            "metadata": row["metadata"],
-            "created_at": row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-        })
+        json.dumps(
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "action": row["action"],
+                "metadata": row["metadata"],
+                "created_at": (
+                    row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else str(row["created_at"])
+                ),
+            }
+        )
         for row in rows
     )
 
     import gzip
+
     jsonl_bytes = jsonl_content.encode("utf-8")
     compressed = gzip.compress(jsonl_bytes)
 
@@ -368,6 +414,7 @@ async def test_restore_s3_reader_integration(
 
     # Upload data file - write to temp file first
     import tempfile
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
         tmp_file.write(compressed)
         tmp_file_path = Path(tmp_file.name)
@@ -437,4 +484,3 @@ async def test_restore_s3_reader_integration(
         table_name=test_table,
     )
     assert full_s3_key in archives or any(full_s3_key in a for a in archives)
-

@@ -150,4 +150,3 @@ def test_count_jsonl_lines_single_line() -> None:
     jsonl_data = b'{"id":1}'
     count = serializer.count_jsonl_lines(jsonl_data)
     assert count == 1
-

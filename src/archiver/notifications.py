@@ -408,4 +408,3 @@ class NotificationManager:
                         channel=channel.__class__.__name__,
                         error=str(e),
                     )
-

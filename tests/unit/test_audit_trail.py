@@ -219,4 +219,3 @@ class TestAuditTrail:
         )
 
         assert mock_s3_client.upload_file.called
-

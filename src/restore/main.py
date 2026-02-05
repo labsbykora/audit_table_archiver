@@ -197,6 +197,7 @@ def main(
     # Keep boto3/botocore at WARNING level to reduce noise while keeping our DEBUG logs
     if verbose:
         import logging as std_logging
+
         std_logging.getLogger("boto3").setLevel(std_logging.WARNING)
         std_logging.getLogger("botocore").setLevel(std_logging.WARNING)
         std_logging.getLogger("urllib3").setLevel(std_logging.WARNING)
@@ -220,7 +221,9 @@ def main(
                 asyncio.run(_list_archives(archiver_config, database, table, logger))
                 sys.exit(0)
             else:
-                logger.error("S3 key is required (--s3-key) or use --restore-all with --database and --table to restore all batches")
+                logger.error(
+                    "S3 key is required (--s3-key) or use --restore-all with --database and --table to restore all batches"
+                )
                 sys.exit(1)
 
         # Determine database and table from S3 key or options
@@ -231,10 +234,16 @@ def main(
                 parts = s3_key.split("/")
                 if len(parts) >= 3:
                     # Skip prefix if present
-                    prefix = archiver_config.s3.prefix.rstrip("/") if archiver_config.s3.prefix else ""
+                    prefix = (
+                        archiver_config.s3.prefix.rstrip("/") if archiver_config.s3.prefix else ""
+                    )
                     if prefix and s3_key.startswith(prefix):
                         # Remove prefix
-                        relative_key = s3_key[len(prefix) + 1 :] if s3_key.startswith(prefix + "/") else s3_key[len(prefix):]
+                        relative_key = (
+                            s3_key[len(prefix) + 1 :]
+                            if s3_key.startswith(prefix + "/")
+                            else s3_key[len(prefix) :]
+                        )
                         parts = relative_key.split("/")
 
                     if not database and len(parts) >= 1:
@@ -348,7 +357,9 @@ async def _list_archives(
         # Format output nicely
         click.echo()
         click.echo(click.style("=" * 70, fg="cyan"))
-        click.echo(click.style(f"Available Archives: {database_name}.{table_name}", fg="cyan", bold=True))
+        click.echo(
+            click.style(f"Available Archives: {database_name}.{table_name}", fg="cyan", bold=True)
+        )
         click.echo(click.style("=" * 70, fg="cyan"))
         click.echo()
         click.echo(click.style(f"Found {len(archives)} archive(s):", fg="green", bold=True))
@@ -397,7 +408,7 @@ async def _list_archives(
         click.echo(click.style("  Restore a specific file:", fg="white"))
         click.echo(
             click.style(
-                f"    python -m restore.main --config config.yaml --s3-key \"<key>\" --database {database_name} --table {table_name}",
+                f'    python -m restore.main --config config.yaml --s3-key "<key>" --database {database_name} --table {table_name}',
                 fg="green",
             )
         )
@@ -408,8 +419,12 @@ async def _list_archives(
         click.echo(click.style("No Archives Found", fg="yellow", bold=True))
         click.echo(click.style("=" * 70, fg="yellow"))
         click.echo()
-        click.echo(click.style("Database: ", fg="white") + click.style(database_name, fg="cyan", bold=True))
-        click.echo(click.style("Table: ", fg="white") + click.style(table_name, fg="cyan", bold=True))
+        click.echo(
+            click.style("Database: ", fg="white") + click.style(database_name, fg="cyan", bold=True)
+        )
+        click.echo(
+            click.style("Table: ", fg="white") + click.style(table_name, fg="cyan", bold=True)
+        )
         click.echo()
         click.echo(click.style("No archived files found for this table.", dim=True))
         click.echo(click.style("Make sure archives exist in S3 and the path is correct.", dim=True))
@@ -653,10 +668,14 @@ async def _restore_all(
     if not archive_keys:
         logger.warning("No archives found to restore", database=database_name, table=table_name)
         if restore_watermark_manager and watermark and not ignore_watermark:
-            click.echo(f"\nNo new archives to restore for database '{database_name}', table '{table_name}'")
+            click.echo(
+                f"\nNo new archives to restore for database '{database_name}', table '{table_name}'"
+            )
             click.echo(f"Last restored: {watermark.last_restored_date.isoformat()}")
             click.echo(f"Total archives already restored: {watermark.total_archives_restored}")
-            click.echo("\nTip: Use --ignore-watermark to restore all archives regardless of watermark")
+            click.echo(
+                "\nTip: Use --ignore-watermark to restore all archives regardless of watermark"
+            )
         else:
             click.echo(f"\nNo archives found for database '{database_name}', table '{table_name}'")
         return
@@ -675,9 +694,13 @@ async def _restore_all(
         if len(archive_keys) > 10:
             click.echo(f"  ... and {len(archive_keys) - 10} more")
         if restore_watermark_manager and watermark and not ignore_watermark:
-            click.echo(f"\nNote: {len(all_archive_keys) - len(archive_keys)} archive(s) already restored (skipped)")
+            click.echo(
+                f"\nNote: {len(all_archive_keys) - len(archive_keys)} archive(s) already restored (skipped)"
+            )
         if ignore_watermark:
-            click.echo(f"\nNote: Watermark ignored - all {len(all_archive_keys)} archive(s) will be processed")
+            click.echo(
+                f"\nNote: Watermark ignored - all {len(all_archive_keys)} archive(s) will be processed"
+            )
         return
 
     # Initialize database manager (reuse connection for all restores)
@@ -686,7 +709,11 @@ async def _restore_all(
 
     try:
         # Re-load watermark with database manager if database storage is enabled (only if not ignoring watermark)
-        if restore_watermark_manager and not ignore_watermark and archiver_config.restore_watermark.storage_type in ("database", "both"):
+        if (
+            restore_watermark_manager
+            and not ignore_watermark
+            and archiver_config.restore_watermark.storage_type in ("database", "both")
+        ):
             try:
                 watermark = await restore_watermark_manager.load_watermark(
                     database_name=database_name,
@@ -729,6 +756,7 @@ async def _restore_all(
         # Log start of bulk restore
         total_files = len(archive_keys)
         from utils.output import print_info as output_print_info
+
         output_print_info(f"Restoring {total_files} archive file(s)...")
         logger.debug(
             "Starting bulk restore",
@@ -757,14 +785,18 @@ async def _restore_all(
                 )
 
                 # Read archive
-                archive = await s3_reader.read_archive(archive_key, validate_checksum=validate_checksum)
+                archive = await s3_reader.read_archive(
+                    archive_key, validate_checksum=validate_checksum
+                )
 
                 # Perform restore
                 stats = await restore_engine.restore_archive(
                     archive=archive,
                     conflict_strategy=conflict_strategy,
                     batch_size=batch_size,
-                    drop_indexes=drop_indexes if idx == 1 else False,  # Only drop indexes for first file
+                    drop_indexes=(
+                        drop_indexes if idx == 1 else False
+                    ),  # Only drop indexes for first file
                     commit_frequency=commit_frequency,
                     dry_run=False,
                     schema_migration_strategy=schema_migration_strategy,
@@ -791,16 +823,27 @@ async def _restore_all(
                             latest_restored_key = archive_key
 
                         # Update watermark after each archive if configured (only if not ignoring watermark)
-                        if not ignore_watermark and archiver_config.restore_watermark.update_after_each_archive:
+                        if (
+                            not ignore_watermark
+                            and archiver_config.restore_watermark.update_after_each_archive
+                        ):
                             try:
                                 await restore_watermark_manager.save_watermark(
                                     database_name=database_name,
                                     table_name=table_name,
                                     last_restored_date=archive_date,
                                     last_restored_s3_key=archive_key,
-                                    total_archives_restored=(watermark.total_archives_restored if watermark else 0) + total_stats["files_processed"],
+                                    total_archives_restored=(
+                                        watermark.total_archives_restored if watermark else 0
+                                    )
+                                    + total_stats["files_processed"],
                                     s3_client=s3_client,
-                                    db_manager=db_manager if archiver_config.restore_watermark.storage_type in ("database", "both") else None,
+                                    db_manager=(
+                                        db_manager
+                                        if archiver_config.restore_watermark.storage_type
+                                        in ("database", "both")
+                                        else None
+                                    ),
                                 )
                                 logger.debug(
                                     "Restore watermark updated",
@@ -833,9 +876,13 @@ async def _restore_all(
                         # Fall back to generic skip reason
                         reason = stats.get("skip_reason", "conflict")
                         if reason:
-                            skip_reasons[reason] = skip_reasons.get(reason, 0) + stats.get("records_skipped", 0)
+                            skip_reasons[reason] = skip_reasons.get(reason, 0) + stats.get(
+                                "records_skipped", 0
+                            )
                         else:
-                            skip_reasons["conflict"] = skip_reasons.get("conflict", 0) + stats.get("records_skipped", 0)
+                            skip_reasons["conflict"] = skip_reasons.get("conflict", 0) + stats.get(
+                                "records_skipped", 0
+                            )
 
                 logger.debug(
                     "Archive restored successfully",
@@ -869,12 +916,14 @@ async def _restore_all(
                 error_msg = str(e)
 
                 # Store failure details
-                failed_files.append({
-                    "file": archive_key,
-                    "file_number": idx,
-                    "error_type": error_type,
-                    "error": error_msg,
-                })
+                failed_files.append(
+                    {
+                        "file": archive_key,
+                        "file_number": idx,
+                        "error_type": error_type,
+                        "error": error_msg,
+                    }
+                )
 
                 logger.error(
                     "Failed to restore archive",
@@ -903,7 +952,12 @@ async def _restore_all(
                                 database_name=database_name,
                                 table_name=table_name,
                                 s3_client=s3_client,
-                                db_manager=db_manager if archiver_config.restore_watermark.storage_type in ("database", "both") else None,
+                                db_manager=(
+                                    db_manager
+                                    if archiver_config.restore_watermark.storage_type
+                                    in ("database", "both")
+                                    else None
+                                ),
                             )
                         except Exception:
                             current_watermark = None
@@ -913,9 +967,17 @@ async def _restore_all(
                         table_name=table_name,
                         last_restored_date=latest_restored_date,
                         last_restored_s3_key=latest_restored_key,
-                        total_archives_restored=(current_watermark.total_archives_restored if current_watermark else 0) + total_stats["files_processed"],
+                        total_archives_restored=(
+                            current_watermark.total_archives_restored if current_watermark else 0
+                        )
+                        + total_stats["files_processed"],
                         s3_client=s3_client,
-                        db_manager=db_manager if archiver_config.restore_watermark.storage_type in ("database", "both") else None,
+                        db_manager=(
+                            db_manager
+                            if archiver_config.restore_watermark.storage_type
+                            in ("database", "both")
+                            else None
+                        ),
                     )
                     if ignore_watermark:
                         logger.debug(
@@ -923,7 +985,12 @@ async def _restore_all(
                             database=database_name,
                             table=table_name,
                             last_restored_date=latest_restored_date.isoformat(),
-                            total_archives_restored=(current_watermark.total_archives_restored if current_watermark else 0) + total_stats["files_processed"],
+                            total_archives_restored=(
+                                current_watermark.total_archives_restored
+                                if current_watermark
+                                else 0
+                            )
+                            + total_stats["files_processed"],
                         )
                     else:
                         logger.debug(
@@ -931,7 +998,12 @@ async def _restore_all(
                             database=database_name,
                             table=table_name,
                             last_restored_date=latest_restored_date.isoformat(),
-                            total_archives_restored=(current_watermark.total_archives_restored if current_watermark else 0) + total_stats["files_processed"],
+                            total_archives_restored=(
+                                current_watermark.total_archives_restored
+                                if current_watermark
+                                else 0
+                            )
+                            + total_stats["files_processed"],
                         )
                 except Exception as e:
                     logger.warning(
@@ -962,19 +1034,40 @@ async def _restore_all(
         print_header("Restore Summary")
 
         print_section("Files")
-        print_key_value("Processed", total_stats['files_processed'])
-        print_key_value("Failed", total_stats['files_failed'], value_color="red" if total_stats['files_failed'] > 0 else "white")
+        print_key_value("Processed", total_stats["files_processed"])
+        print_key_value(
+            "Failed",
+            total_stats["files_failed"],
+            value_color="red" if total_stats["files_failed"] > 0 else "white",
+        )
         print_key_value("Total", len(archive_keys))
-        if restore_watermark_manager and watermark and len(all_archive_keys) > len(archive_keys) and not ignore_watermark:
-            print_key_value("Already Restored (Skipped)", len(all_archive_keys) - len(archive_keys), value_color="yellow")
+        if (
+            restore_watermark_manager
+            and watermark
+            and len(all_archive_keys) > len(archive_keys)
+            and not ignore_watermark
+        ):
+            print_key_value(
+                "Already Restored (Skipped)",
+                len(all_archive_keys) - len(archive_keys),
+                value_color="yellow",
+            )
         if ignore_watermark:
             print_info("Watermark ignored - all archives processed")
 
         print_section("Records")
         print_key_value("Processed", f"{total_stats['records_processed']:,}")
         print_key_value("Restored", f"{total_stats['records_restored']:,}", value_color="green")
-        print_key_value("Skipped", f"{total_stats['records_skipped']:,}", value_color="yellow" if total_stats['records_skipped'] > 0 else "white")
-        print_key_value("Failed", f"{total_stats['records_failed']:,}", value_color="red" if total_stats['records_failed'] > 0 else "white")
+        print_key_value(
+            "Skipped",
+            f"{total_stats['records_skipped']:,}",
+            value_color="yellow" if total_stats["records_skipped"] > 0 else "white",
+        )
+        print_key_value(
+            "Failed",
+            f"{total_stats['records_failed']:,}",
+            value_color="red" if total_stats["records_failed"] > 0 else "white",
+        )
 
         # Show skip reasons if any
         if skip_reasons:
@@ -1001,12 +1094,22 @@ async def _restore_all(
                 failures_by_type[error_type].append(failure)
 
             # Show summary by error type
-            for error_type, failures in sorted(failures_by_type.items(), key=lambda x: len(x[1]), reverse=True):
+            for error_type, failures in sorted(
+                failures_by_type.items(), key=lambda x: len(x[1]), reverse=True
+            ):
                 click.echo(f"\n  {error_type}: {len(failures)} file(s)")
                 # Show first 3 examples of each error type
                 for failure in failures[:3]:
-                    file_name = failure["file"].split("/")[-1] if "/" in failure["file"] else failure["file"]
-                    error_msg = failure["error"][:80] + "..." if len(failure["error"]) > 80 else failure["error"]
+                    file_name = (
+                        failure["file"].split("/")[-1]
+                        if "/" in failure["file"]
+                        else failure["file"]
+                    )
+                    error_msg = (
+                        failure["error"][:80] + "..."
+                        if len(failure["error"]) > 80
+                        else failure["error"]
+                    )
                     click.echo(f"    • {file_name}: {error_msg}")
                 if len(failures) > 3:
                     click.echo(f"    ... and {len(failures) - 3} more file(s) with the same error")
@@ -1015,7 +1118,9 @@ async def _restore_all(
             if verbose:
                 click.echo("\n  All failed files:")
                 for failure in failed_files:
-                    click.echo(f"    [{failure['file_number']}/{len(archive_keys)}] {failure['file']}")
+                    click.echo(
+                        f"    [{failure['file_number']}/{len(archive_keys)}] {failure['file']}"
+                    )
                     click.echo(f"      Error: {failure['error_type']}: {failure['error']}")
 
         click.echo()
@@ -1026,4 +1131,3 @@ async def _restore_all(
 
 if __name__ == "__main__":
     main()
-

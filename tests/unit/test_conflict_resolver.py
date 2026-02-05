@@ -120,6 +120,7 @@ class TestConflictDetector:
     async def test_detect_conflicts_with_conflicts(self, detector, primary_key, records):
         """Test conflict detection when conflicts exist."""
         db_manager = MagicMock(spec=DatabaseManager)
+
         # Return existing records with IDs 1 and 2
         # The fetch returns rows that can be indexed by primary_key
         # The code does: existing_pk_set = {row[primary_key] for row in existing_pks if primary_key in row}
@@ -144,7 +145,9 @@ class TestConflictDetector:
         assert report.has_conflicts is True
         assert report.total_conflicts == 2
         # Check conflicts list contains the conflicting PKs
-        conflict_pk_values = [c.get("primary_key_value") for c in report.conflicts if "primary_key_value" in c]
+        conflict_pk_values = [
+            c.get("primary_key_value") for c in report.conflicts if "primary_key_value" in c
+        ]
         assert 1 in conflict_pk_values
         assert 2 in conflict_pk_values
 
@@ -257,4 +260,3 @@ class TestConflictResolver:
 
         # Record without id should be kept
         assert len(filtered) == 2
-

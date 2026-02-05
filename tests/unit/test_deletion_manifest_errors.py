@@ -134,4 +134,3 @@ def test_verify_manifest_missing_key(generator: DeletionManifestGenerator) -> No
 
     result = generator.verify_manifest(manifest, expected)
     assert result is False
-

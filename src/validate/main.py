@@ -154,8 +154,11 @@ def main(
 
                 print_header("Archive Validation", color="cyan" if result_dict["valid"] else "red")
                 print_key_value("S3 Key", s3_key)
-                print_key_value("Status", "Valid" if result_dict["valid"] else "Invalid",
-                              value_color="green" if result_dict["valid"] else "red")
+                print_key_value(
+                    "Status",
+                    "Valid" if result_dict["valid"] else "Invalid",
+                    value_color="green" if result_dict["valid"] else "red",
+                )
 
                 if result_dict.get("record_count"):
                     print_key_value("Record Count", f"{result_dict['record_count']:,}")
@@ -200,8 +203,9 @@ def main(
                 )
 
                 # Format validation results nicely
-                print_header("Archive Validation Results",
-                           color="green" if result.is_valid else "red")
+                print_header(
+                    "Archive Validation Results", color="green" if result.is_valid else "red"
+                )
 
                 print_section("Overview")
                 print_key_value("Total Archives", result.total_archives)
@@ -251,4 +255,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-

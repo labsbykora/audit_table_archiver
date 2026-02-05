@@ -140,7 +140,9 @@ class TestArchiveValidator:
         with patch.object(validator.s3_reader, "read_archive", new_callable=AsyncMock) as mock_read:
             mock_read.return_value = mock_archive
 
-            result = await validator.validate_archive("test-key.jsonl.gz", validate_record_count=True)
+            result = await validator.validate_archive(
+                "test-key.jsonl.gz", validate_record_count=True
+            )
 
             assert result["valid"] is False
             assert any("record count" in error.lower() for error in result["errors"])
@@ -184,7 +186,9 @@ class TestArchiveValidator:
     @pytest.mark.asyncio
     async def test_validate_archives_empty(self, validator):
         """Test validating archives when none exist."""
-        with patch.object(validator.s3_reader, "list_archives", new_callable=AsyncMock) as mock_list:
+        with patch.object(
+            validator.s3_reader, "list_archives", new_callable=AsyncMock
+        ) as mock_list:
             mock_list.return_value = []
 
             result = await validator.validate_archives()
@@ -205,10 +209,14 @@ class TestArchiveValidator:
         mock_archive.record_count = 100
         mock_archive.parse_records.return_value = [{"id": i} for i in range(100)]
 
-        with patch.object(validator.s3_reader, "list_archives", new_callable=AsyncMock) as mock_list:
+        with patch.object(
+            validator.s3_reader, "list_archives", new_callable=AsyncMock
+        ) as mock_list:
             mock_list.return_value = ["archive1.jsonl.gz", "archive2.jsonl.gz"]
 
-            with patch.object(validator, "validate_archive", new_callable=AsyncMock) as mock_validate:
+            with patch.object(
+                validator, "validate_archive", new_callable=AsyncMock
+            ) as mock_validate:
                 mock_validate.return_value = {"valid": True, "errors": []}
 
                 result = await validator.validate_archives(
@@ -225,10 +233,14 @@ class TestArchiveValidator:
     @pytest.mark.asyncio
     async def test_validate_archives_with_errors(self, validator):
         """Test validating archives with some errors."""
-        with patch.object(validator.s3_reader, "list_archives", new_callable=AsyncMock) as mock_list:
+        with patch.object(
+            validator.s3_reader, "list_archives", new_callable=AsyncMock
+        ) as mock_list:
             mock_list.return_value = ["archive1.jsonl.gz", "archive2.jsonl.gz"]
 
-            with patch.object(validator, "validate_archive", new_callable=AsyncMock) as mock_validate:
+            with patch.object(
+                validator, "validate_archive", new_callable=AsyncMock
+            ) as mock_validate:
                 mock_validate.side_effect = [
                     {"valid": True, "errors": []},
                     {"valid": False, "errors": ["checksum mismatch"]},
@@ -244,14 +256,17 @@ class TestArchiveValidator:
     @pytest.mark.asyncio
     async def test_find_orphaned_files(self, validator):
         """Test finding orphaned files."""
-        with patch.object(validator.s3_reader, "list_archives", new_callable=AsyncMock) as mock_list:
+        with patch.object(
+            validator.s3_reader, "list_archives", new_callable=AsyncMock
+        ) as mock_list:
             mock_list.return_value = ["archive1.jsonl.gz"]
 
-            with patch.object(validator.s3_reader, "read_archive", new_callable=AsyncMock) as mock_read:
+            with patch.object(
+                validator.s3_reader, "read_archive", new_callable=AsyncMock
+            ) as mock_read:
                 mock_read.side_effect = S3Error("metadata not found", context={})
 
                 orphaned = await validator._find_orphaned_files(["archive1.jsonl.gz"])
 
                 assert len(orphaned) == 1
                 assert "archive1.jsonl.gz" in orphaned[0]
-

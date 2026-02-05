@@ -275,4 +275,3 @@ def test_upload_without_encryption_minio(s3_client: S3Client, tmp_path: Path) ->
     put_call = mock_client.put_object.call_args
     assert put_call is not None
     # For MinIO, ServerSideEncryption should not be in kwargs
-

@@ -260,4 +260,3 @@ async def test_lock_manager_acquire_lock_missing_file_path() -> None:
 
     with pytest.raises(ValueError, match="lock_file_path is required"):
         await manager.acquire_lock("test_db")
-

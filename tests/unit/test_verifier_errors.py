@@ -71,4 +71,3 @@ def test_verify_primary_keys_duplicates(verifier: Verifier) -> None:
     # Duplicates are handled by converting to sets, so these should match
     # (both become {1, 2, 3})
     verifier.verify_primary_keys(db_pks, expected_pks)
-

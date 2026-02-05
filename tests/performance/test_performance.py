@@ -74,9 +74,7 @@ def test_compression_performance() -> None:
 
 @pytest.mark.performance
 @pytest.mark.asyncio
-async def test_batch_selection_performance(
-    db_connection, test_table: str
-) -> None:
+async def test_batch_selection_performance(db_connection, test_table: str) -> None:
     """Test batch selection performance."""
     import os
 
@@ -143,9 +141,7 @@ async def test_batch_selection_performance(
 
 @pytest.mark.performance
 @pytest.mark.asyncio
-async def test_end_to_end_throughput(
-    archiver_config, test_table: str, db_connection
-) -> None:
+async def test_end_to_end_throughput(archiver_config, test_table: str, db_connection) -> None:
     """Test end-to-end throughput (target: >10K records/minute)."""
     from archiver.archiver import Archiver
 
@@ -186,4 +182,3 @@ async def test_end_to_end_throughput(
     print(f"\nPerformance: {records_per_minute:.0f} records/minute")
     print(f"Total time: {elapsed:.2f} seconds")
     print(f"Records archived: {records_archived}")
-

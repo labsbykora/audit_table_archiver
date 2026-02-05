@@ -213,7 +213,9 @@ async def download_and_restore(
             restored_count += len(batch)
             print(f"   Restored {restored_count}/{len(records)} records...", end="\r")
 
-        print(f"\n[OK] Successfully restored {restored_count} records to {schema_name}.{table_name}")
+        print(
+            f"\n[OK] Successfully restored {restored_count} records to {schema_name}.{table_name}"
+        )
 
         # Verify
         count = await conn.fetchval(f"SELECT COUNT(*) FROM {schema_name}.{table_name}")
@@ -231,7 +233,9 @@ async def download_and_restore(
 
 def main() -> None:
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Manually restore archived data from S3 to PostgreSQL")
+    parser = argparse.ArgumentParser(
+        description="Manually restore archived data from S3 to PostgreSQL"
+    )
     parser.add_argument("--s3-endpoint", required=True, help="S3 endpoint URL")
     parser.add_argument("--s3-bucket", required=True, help="S3 bucket name")
     parser.add_argument("--s3-key", required=True, help="S3 object key")
@@ -267,4 +271,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

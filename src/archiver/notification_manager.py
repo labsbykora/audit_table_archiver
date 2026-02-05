@@ -99,11 +99,15 @@ class DigestCollector:
         failed_runs = len([e for e in self.events if e["event_type"] == "failure"])
 
         total_records = sum(
-            e["metadata"].get("records_archived", 0) for e in self.events if "records_archived" in e.get("metadata", {})
+            e["metadata"].get("records_archived", 0)
+            for e in self.events
+            if "records_archived" in e.get("metadata", {})
         )
 
         total_duration = sum(
-            e["metadata"].get("duration_seconds", 0) for e in self.events if "duration_seconds" in e.get("metadata", {})
+            e["metadata"].get("duration_seconds", 0)
+            for e in self.events
+            if "duration_seconds" in e.get("metadata", {})
         )
 
         databases = set()
@@ -235,7 +239,10 @@ class EnhancedNotificationManager:
 
         # Handle quiet hours that span midnight (e.g., 22:00 - 06:00)
         if self.config.quiet_hours_start > self.config.quiet_hours_end:
-            return current_hour >= self.config.quiet_hours_start or current_hour < self.config.quiet_hours_end
+            return (
+                current_hour >= self.config.quiet_hours_start
+                or current_hour < self.config.quiet_hours_end
+            )
         else:
             return self.config.quiet_hours_start <= current_hour < self.config.quiet_hours_end
 
@@ -253,7 +260,9 @@ class EnhancedNotificationManager:
 
         # Check quiet hours
         if self._is_quiet_hours():
-            self.logger.debug("Quiet hours active, skipping notification", notification_type=notification_type)
+            self.logger.debug(
+                "Quiet hours active, skipping notification", notification_type=notification_type
+            )
             return False
 
         # Check rate limiting
@@ -465,4 +474,3 @@ class EnhancedNotificationManager:
     async def close(self) -> None:
         """Close all notification channels."""
         await self.notification_manager.close()
-

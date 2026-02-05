@@ -119,9 +119,7 @@ class TestMultipartUploader:
 
     def test_initiate_upload(self, uploader, mock_s3_client):
         """Test initiating multipart upload."""
-        mock_s3_client.client.create_multipart_upload.return_value = {
-            "UploadId": "test-upload-id"
-        }
+        mock_s3_client.client.create_multipart_upload.return_value = {"UploadId": "test-upload-id"}
 
         with tempfile.NamedTemporaryFile(delete=False) as f:
             f.write(b"test data")
@@ -163,9 +161,7 @@ class TestMultipartUploader:
 
     def test_complete_upload(self, uploader, mock_s3_client):
         """Test completing multipart upload."""
-        mock_s3_client.client.complete_multipart_upload.return_value = {
-            "ETag": "final-etag"
-        }
+        mock_s3_client.client.complete_multipart_upload.return_value = {"ETag": "final-etag"}
 
         state = MultipartUploadState(
             upload_id="test-upload-id",
@@ -203,4 +199,3 @@ class TestMultipartUploader:
         uploader._abort_upload(state)
         mock_s3_client.client.abort_multipart_upload.assert_called_once()
         assert not state.state_file.exists()  # Should be cleaned up
-

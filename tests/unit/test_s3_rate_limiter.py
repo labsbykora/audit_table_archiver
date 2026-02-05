@@ -88,4 +88,3 @@ class TestS3RateLimiter:
         assert stats["total_requests"] == 1
         assert stats["current_rate"] == 10.0
         assert "available_tokens" in stats
-

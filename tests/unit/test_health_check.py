@@ -233,4 +233,3 @@ class TestHealthChecker:
         assert isinstance(status, HealthStatus)
         assert status.healthy is False
         assert status.checks["databases"]["test_db"]["healthy"] is False
-

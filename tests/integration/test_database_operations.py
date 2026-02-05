@@ -1,6 +1,5 @@
 """Integration tests for database operations."""
 
-
 import pytest
 
 from archiver.config import DatabaseConfig
@@ -110,4 +109,3 @@ async def test_database_manager_transaction(db_connection, test_table: str) -> N
 
     finally:
         await db_manager.disconnect()
-

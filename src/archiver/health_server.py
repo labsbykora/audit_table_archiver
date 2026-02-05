@@ -121,4 +121,3 @@ class HealthCheckServer:
             ),
             content_type="application/json",
         )
-

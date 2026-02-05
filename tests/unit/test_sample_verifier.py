@@ -176,10 +176,12 @@ async def test_verify_samples_found_in_database():
 
     # Mock database manager to return found records
     mock_db_manager = MagicMock(spec=DatabaseManager)
-    mock_db_manager.fetch = AsyncMock(return_value=[
-        {"id": 1},
-        {"id": 2},
-    ])
+    mock_db_manager.fetch = AsyncMock(
+        return_value=[
+            {"id": 1},
+            {"id": 2},
+        ]
+    )
 
     sample_pks = [1, 2, 3]
 
@@ -213,4 +215,3 @@ def test_sample_verifier_init_invalid_max_samples():
     """Test that invalid max_samples raises error."""
     with pytest.raises(ValueError, match="Max samples.*must be >= min samples"):
         SampleVerifier(min_samples=10, max_samples=5)
-

@@ -61,7 +61,7 @@ def calculate_backoff_delay(
         Delay in seconds
     """
     # Exponential backoff: delay = initial * (base ^ attempt)
-    delay = initial_delay * (exponential_base ** attempt)
+    delay = initial_delay * (exponential_base**attempt)
 
     # Cap at max_delay
     delay = min(delay, max_delay)
@@ -208,4 +208,3 @@ def retry_sync(
     if last_exception:
         raise last_exception
     raise RuntimeError("Retry logic error")
-

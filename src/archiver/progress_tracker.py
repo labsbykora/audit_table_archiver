@@ -115,7 +115,9 @@ class ProgressTracker:
         if records_processed_this_run is not None:
             self.records_processed_this_run = records_processed_this_run
         else:
-            self.records_processed_this_run = records_processed - self.initial_records_from_checkpoint
+            self.records_processed_this_run = (
+                records_processed - self.initial_records_from_checkpoint
+            )
 
         self.batches_completed = batches_completed
         if batches_total is not None:
@@ -170,11 +172,15 @@ class ProgressTracker:
         # Calculate percentages
         percentage_overall = 0.0
         if self.records_total_overall and self.records_total_overall > 0:
-            percentage_overall = min(100.0, (self.records_processed_total / self.records_total_overall) * 100)
+            percentage_overall = min(
+                100.0, (self.records_processed_total / self.records_total_overall) * 100
+            )
 
         percentage_this_run = 0.0
         if self.records_total_this_run and self.records_total_this_run > 0:
-            percentage_this_run = min(100.0, (self.records_processed_this_run / self.records_total_this_run) * 100)
+            percentage_this_run = min(
+                100.0, (self.records_processed_this_run / self.records_total_this_run) * 100
+            )
 
         # Calculate ETA (based on overall progress)
         eta_seconds: Optional[float] = None
@@ -234,7 +240,9 @@ class ProgressTracker:
             records_processed=self.records_processed,
             batches_completed=self.batches_completed,
             elapsed=elapsed_str,
-            average_rate=f"{self.records_per_second:.0f} rec/s" if self.records_per_second > 0 else "N/A",
+            average_rate=(
+                f"{self.records_per_second:.0f} rec/s" if self.records_per_second > 0 else "N/A"
+            ),
         )
 
     def get_eta(self) -> Optional[timedelta]:
@@ -263,4 +271,3 @@ class ProgressTracker:
         if not self.records_total or self.records_total == 0:
             return 0.0
         return min(100.0, (self.records_processed / self.records_total) * 100)
-

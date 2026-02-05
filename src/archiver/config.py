@@ -123,6 +123,7 @@ class S3Config(BaseModel):
         # If both are in config file, use them (with warning)
         if config_has_key and config_has_secret:
             import warnings
+
             warnings.warn(
                 "Using AWS credentials from config file. "
                 "This is not recommended for production. "
@@ -238,6 +239,7 @@ class DatabaseConfig(BaseModel):
         elif self.password:
             # Log warning when using password from config file
             import warnings
+
             warnings.warn(
                 f"Using password from config file for database '{self.name}'. "
                 f"This is not recommended for production. Use 'password_env' instead.",
@@ -594,4 +596,3 @@ def load_config(config_path: Path) -> ArchiverConfig:
         raise ValueError(f"Invalid YAML in configuration file: {e}") from e
     except Exception as e:
         raise ValueError(f"Configuration validation failed: {e}") from e
-

@@ -128,4 +128,3 @@ class Verifier:
             count=len(fetched_pks),
             **context,
         )
-

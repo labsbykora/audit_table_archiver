@@ -171,4 +171,3 @@ async def test_checkpoint_to_dict_and_from_dict():
     assert loaded_checkpoint.batch_number == checkpoint.batch_number
     assert loaded_checkpoint.records_archived == checkpoint.records_archived
     assert loaded_checkpoint.last_primary_key == checkpoint.last_primary_key
-

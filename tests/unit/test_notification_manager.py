@@ -254,4 +254,3 @@ class TestEnhancedNotificationManager:
 
         # Should not raise
         await manager.close()
-

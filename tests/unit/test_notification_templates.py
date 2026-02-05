@@ -1,7 +1,5 @@
 """Unit tests for notification templates."""
 
-
-
 from archiver.notification_templates import NotificationTemplate
 
 
@@ -23,7 +21,7 @@ class TestNotificationTemplate:
         assert "✅" in subject
         assert "test_db" in subject
         assert "test_table" in subject
-        assert ("1000" in message or "1,000" in message)  # May be formatted with commas
+        assert "1000" in message or "1,000" in message  # May be formatted with commas
         assert "5" in message
         assert "120.5" in message
         assert "s3://bucket/path" in message
@@ -76,7 +74,7 @@ class TestNotificationTemplate:
 
         assert "🔄" in subject
         assert "test_db" in subject
-        assert ("5000" in message or "5,000" in message)  # May be formatted with commas
+        assert "5000" in message or "5,000" in message  # May be formatted with commas
         assert metadata["records_eligible"] == 5000
 
     def test_threshold_violation(self):
@@ -129,7 +127,7 @@ class TestNotificationTemplate:
         assert "10" in message
         assert "8" in message
         assert "2" in message
-        assert ("50000" in message or "50,000" in message)  # May be formatted with commas
+        assert "50000" in message or "50,000" in message  # May be formatted with commas
         assert "600.0" in message
         assert "Error 1" in message
         assert "Error 2" in message
@@ -156,8 +154,7 @@ class TestNotificationTemplate:
     def test_digest_summary_many_errors(self):
         """Test digest summary template with many errors (should show first 5)."""
         errors = [
-            {"database": f"db{i}", "table": f"table{i}", "error": f"Error {i}"}
-            for i in range(10)
+            {"database": f"db{i}", "table": f"table{i}", "error": f"Error {i}"} for i in range(10)
         ]
 
         subject, message, metadata = NotificationTemplate.digest_summary(
@@ -176,4 +173,3 @@ class TestNotificationTemplate:
         assert "Error 5" not in message  # Should not show 6th error
         assert "and 5 more" in message
         assert len(metadata["errors"]) == 10  # All errors in metadata
-

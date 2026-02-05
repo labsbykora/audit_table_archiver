@@ -84,6 +84,7 @@ def main(
     # Keep boto3/botocore at WARNING level to reduce noise while keeping our DEBUG logs
     if verbose:
         import logging as std_logging
+
         std_logging.getLogger("boto3").setLevel(std_logging.WARNING)
         std_logging.getLogger("botocore").setLevel(std_logging.WARNING)
         std_logging.getLogger("urllib3").setLevel(std_logging.WARNING)
@@ -150,4 +151,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-

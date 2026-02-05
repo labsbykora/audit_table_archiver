@@ -116,13 +116,23 @@ class Archiver:
 
         # Initialize monitoring components
         monitoring_config = config.monitoring or MonitoringConfig()
-        self.metrics = ArchiverMetrics(logger=self.logger, registry=CollectorRegistry()) if monitoring_config.metrics_enabled else None
-        self.progress_tracker = ProgressTracker(
-            quiet=monitoring_config.quiet_mode,
-            update_interval=monitoring_config.progress_update_interval,
-            logger=self.logger,
-        ) if monitoring_config.progress_enabled else None
-        self.health_checker = HealthChecker(logger=self.logger) if monitoring_config.health_check_enabled else None
+        self.metrics = (
+            ArchiverMetrics(logger=self.logger, registry=CollectorRegistry())
+            if monitoring_config.metrics_enabled
+            else None
+        )
+        self.progress_tracker = (
+            ProgressTracker(
+                quiet=monitoring_config.quiet_mode,
+                update_interval=monitoring_config.progress_update_interval,
+                logger=self.logger,
+            )
+            if monitoring_config.progress_enabled
+            else None
+        )
+        self.health_checker = (
+            HealthChecker(logger=self.logger) if monitoring_config.health_check_enabled else None
+        )
         self.health_server: Optional[HealthCheckServer] = None
 
         # Start metrics server if enabled
@@ -212,7 +222,11 @@ class Archiver:
                 )
 
         # Send digest notification if enabled
-        if self.notification_manager and self.config.notifications and self.config.notifications.digest_mode:
+        if (
+            self.notification_manager
+            and self.config.notifications
+            and self.config.notifications.digest_mode
+        ):
             try:
                 await self.notification_manager.send_digest()
             except Exception as e:
@@ -237,6 +251,7 @@ class Archiver:
         # Check if console format is being used (not JSON)
         try:
             from utils.output import print_summary
+
             # Only print if we're likely in console mode (not JSON)
             # This is a simple heuristic - in production, you might want to pass a flag
             print_summary(stats, title="Archival Summary")
@@ -320,14 +335,9 @@ class Archiver:
         self.logger.debug("Processing database", database=db_config.name)
 
         # Get connection pool size (database-specific or global default)
-        pool_size = (
-            db_config.connection_pool_size
-            or self.config.defaults.connection_pool_size
-        )
+        pool_size = db_config.connection_pool_size or self.config.defaults.connection_pool_size
 
-        db_manager = DatabaseManager(
-            db_config, pool_size=pool_size, logger=self.logger
-        )
+        db_manager = DatabaseManager(db_config, pool_size=pool_size, logger=self.logger)
         s3_client = S3Client(self.config.s3, logger=self.logger)
 
         # Acquire database-level lock to prevent concurrent runs
@@ -513,7 +523,9 @@ class Archiver:
                 schema_name=table_config.schema_name,
                 status="skipped",
                 error_message=f"Legal hold active: {legal_hold.reason}",
-                metadata={"legal_hold": {"reason": legal_hold.reason, "requestor": legal_hold.requestor}},
+                metadata={
+                    "legal_hold": {"reason": legal_hold.reason, "requestor": legal_hold.requestor}
+                },
                 s3_client=s3_client,
             )
             return
@@ -812,7 +824,9 @@ class Archiver:
                     # records_archived_this_run is for this table only in this run
                     # records_archived_so_far is the overall for this table (including checkpoint)
                     # Accumulate this run's count (stats["records_archived"] is already the sum, but we track separately for clarity)
-                    stats["records_archived_this_run"] = stats.get("records_archived_this_run", 0) + records_archived_this_run
+                    stats["records_archived_this_run"] = (
+                        stats.get("records_archived_this_run", 0) + records_archived_this_run
+                    )
                     # Use the maximum overall across all tables to show total progress
                     if records_archived_so_far > stats.get("records_archived_total", 0):
                         stats["records_archived_total"] = records_archived_so_far
@@ -892,7 +906,9 @@ class Archiver:
                     records,
                     batch_number,
                     stats,
-                    table_schema=table_schema if is_first_batch else None,  # Pass schema for first batch
+                    table_schema=(
+                        table_schema if is_first_batch else None
+                    ),  # Pass schema for first batch
                 )
 
                 # Update cursor for next batch
@@ -932,7 +948,9 @@ class Archiver:
                     )
 
                 # Save checkpoint every N batches (for resume capability)
-                if not self.dry_run and self.checkpoint_manager.should_save_checkpoint(batch_number):
+                if not self.dry_run and self.checkpoint_manager.should_save_checkpoint(
+                    batch_number
+                ):
                     try:
                         checkpoint = Checkpoint(
                             database_name=db_config.name,
@@ -1164,7 +1182,9 @@ class Archiver:
             # Build S3 key with prefix if configured
             if self.config.s3.prefix:
                 prefix = self.config.s3.prefix.rstrip("/")
-                s3_key = f"{prefix}/{db_config.name}/{table_config.name}/{date_partition}/{filename}"
+                s3_key = (
+                    f"{prefix}/{db_config.name}/{table_config.name}/{date_partition}/{filename}"
+                )
             else:
                 s3_key = f"{db_config.name}/{table_config.name}/{date_partition}/{filename}"
 
@@ -1209,9 +1229,13 @@ class Archiver:
                 prefix = self.config.s3.prefix.rstrip("/")
                 metadata_key = f"{prefix}/{db_config.name}/{table_config.name}/{date_partition}/{metadata_filename}"
             else:
-                metadata_key = f"{db_config.name}/{table_config.name}/{date_partition}/{metadata_filename}"
+                metadata_key = (
+                    f"{db_config.name}/{table_config.name}/{date_partition}/{metadata_filename}"
+                )
 
-            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_meta_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".json", encoding="utf-8"
+            ) as tmp_meta_file:
                 tmp_meta_path = Path(tmp_meta_file.name)
                 tmp_meta_file.write(metadata_json)
 
@@ -1356,9 +1380,13 @@ class Archiver:
                 prefix = self.config.s3.prefix.rstrip("/")
                 manifest_key = f"{prefix}/{db_config.name}/{table_config.name}/{date_partition}/{manifest_filename}"
             else:
-                manifest_key = f"{db_config.name}/{table_config.name}/{date_partition}/{manifest_filename}"
+                manifest_key = (
+                    f"{db_config.name}/{table_config.name}/{date_partition}/{manifest_filename}"
+                )
 
-            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_manifest_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".json", encoding="utf-8"
+            ) as tmp_manifest_file:
                 tmp_manifest_path = Path(tmp_manifest_file.name)
                 tmp_manifest_file.write(manifest_json)
 
@@ -1446,9 +1474,7 @@ class Archiver:
         # Return S3 key for tracking at table level
         return s3_key
 
-    def _generate_batch_id(
-        self, database: str, table: str, batch_number: int
-    ) -> str:
+    def _generate_batch_id(self, database: str, table: str, batch_number: int) -> str:
         """Generate deterministic batch ID.
 
         Args:
@@ -1487,10 +1513,7 @@ class Archiver:
             objects = s3_client.list_objects(prefix=search_prefix)
 
             # Filter for metadata files
-            metadata_files = [
-                obj for obj in objects
-                if obj["key"].endswith(".metadata.json")
-            ]
+            metadata_files = [obj for obj in objects if obj["key"].endswith(".metadata.json")]
 
             if not metadata_files:
                 self.logger.debug(
@@ -1531,4 +1554,3 @@ class Archiver:
                 error=str(e),
             )
             return None
-

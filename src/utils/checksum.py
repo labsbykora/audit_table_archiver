@@ -83,4 +83,3 @@ class ChecksumCalculator:
                 f"Checksum mismatch: expected {expected_checksum}, "
                 f"got {self.calculate_sha256(data)}"
             )
-

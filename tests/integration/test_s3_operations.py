@@ -62,4 +62,3 @@ def test_s3_upload_retry(s3_client) -> None:
 
     finally:
         file_path.unlink()
-

@@ -279,4 +279,3 @@ class DatabaseManager:
             if match:
                 return match.group(1)
         return "unknown"
-

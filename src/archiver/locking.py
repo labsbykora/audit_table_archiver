@@ -225,9 +225,7 @@ class LockManager:
 
         self._heartbeat_task = asyncio.create_task(heartbeat_loop())
 
-    async def _acquire_postgresql_lock(
-        self, lock_key: str, db_manager: DatabaseManager
-    ) -> Lock:
+    async def _acquire_postgresql_lock(self, lock_key: str, db_manager: DatabaseManager) -> Lock:
         """Acquire PostgreSQL advisory lock.
 
         Args:
@@ -347,9 +345,7 @@ class LockManager:
         # In practice, advisory locks are released when the session ends
         pass
 
-    async def _acquire_redis_lock(
-        self, lock_key: str, redis_client: Any
-    ) -> Lock:
+    async def _acquire_redis_lock(self, lock_key: str, redis_client: Any) -> Lock:
         """Acquire Redis lock.
 
         Args:
@@ -384,9 +380,7 @@ class LockManager:
         """
         raise NotImplementedError("Redis locking not yet implemented")
 
-    async def _acquire_file_lock(
-        self, lock_key: str, lock_file_path: Path
-    ) -> Lock:
+    async def _acquire_file_lock(self, lock_key: str, lock_file_path: Path) -> Lock:
         """Acquire file-based lock.
 
         Args:
@@ -538,4 +532,3 @@ class LockManager:
                 lock_id=lock.lock_id,
                 error=str(e),
             )
-

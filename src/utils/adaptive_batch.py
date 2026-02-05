@@ -94,4 +94,3 @@ class AdaptiveBatchSizer:
         self.current_batch_size = self.min_batch_size
         self.query_times.clear()
         self.logger.debug("Adaptive batch sizer reset")
-

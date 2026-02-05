@@ -132,4 +132,3 @@ def test_wizard_suggest_batch_size():
 
     # Very large dataset
     assert wizard.suggest_batch_size(1000000) == 10000
-

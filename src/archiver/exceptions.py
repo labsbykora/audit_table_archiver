@@ -69,4 +69,3 @@ class TransactionError(ArchiverError):
     """Transaction-related errors."""
 
     pass
-

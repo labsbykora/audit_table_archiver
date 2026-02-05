@@ -132,13 +132,9 @@ class LocalFallback:
                 try:
                     saved_at = datetime.fromisoformat(saved_at_str.replace("Z", "+00:00"))
                 except (ValueError, AttributeError):
-                    saved_at = datetime.fromtimestamp(
-                        file_path.stat().st_mtime, tz=timezone.utc
-                    )
+                    saved_at = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
             else:
-                saved_at = datetime.fromtimestamp(
-                    file_path.stat().st_mtime, tz=timezone.utc
-                )
+                saved_at = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
 
             # Filter by age
             if saved_at < threshold:
@@ -204,9 +200,7 @@ class LocalFallback:
 
             # Check file age
             try:
-                file_mtime = datetime.fromtimestamp(
-                    check_file.stat().st_mtime, tz=timezone.utc
-                )
+                file_mtime = datetime.fromtimestamp(check_file.stat().st_mtime, tz=timezone.utc)
             except (OSError, ValueError):
                 continue
 
@@ -222,10 +216,10 @@ class LocalFallback:
             try:
                 if original_file.exists():
                     original_file.unlink()
-                if is_metadata or (original_file.with_suffix(original_file.suffix + ".meta.json").exists()):
-                    metadata_file = original_file.with_suffix(
-                        original_file.suffix + ".meta.json"
-                    )
+                if is_metadata or (
+                    original_file.with_suffix(original_file.suffix + ".meta.json").exists()
+                ):
+                    metadata_file = original_file.with_suffix(original_file.suffix + ".meta.json")
                     if metadata_file.exists():
                         metadata_file.unlink()
                 stats["deleted"] += 1
@@ -271,4 +265,3 @@ class LocalFallback:
                 for upload in failed_uploads
             ],
         }
-

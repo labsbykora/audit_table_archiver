@@ -59,7 +59,9 @@ class MultipartUploadState:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], state_file: Optional[Path] = None) -> "MultipartUploadState":
+    def from_dict(
+        cls, data: dict[str, Any], state_file: Optional[Path] = None
+    ) -> "MultipartUploadState":
         """Create state from dictionary."""
         return cls(
             upload_id=data["upload_id"],
@@ -159,7 +161,9 @@ class MultipartUploader:
         safe_key = s3_key.replace("/", "_").replace("\\", "_")
         return self.state_dir / f"{safe_key}.json"
 
-    def _initiate_upload(self, s3_key: str, file_path: Path, file_size: int) -> MultipartUploadState:
+    def _initiate_upload(
+        self, s3_key: str, file_path: Path, file_size: int
+    ) -> MultipartUploadState:
         """Initiate a new multipart upload.
 
         Args:
@@ -454,4 +458,3 @@ class MultipartUploader:
                     "total_parts": state.total_parts,
                 },
             ) from e
-

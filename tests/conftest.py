@@ -20,4 +20,3 @@ async def async_fixture() -> AsyncGenerator[None, None]:
     # Setup
     yield
     # Teardown
-

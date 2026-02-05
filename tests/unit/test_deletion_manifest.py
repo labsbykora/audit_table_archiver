@@ -80,4 +80,3 @@ def test_manifest_to_json():
     assert parsed["manifest_info"]["table"] == "test_table"
     assert parsed["deletion_info"]["primary_keys_count"] == 3
     assert parsed["deletion_info"]["deleted_count"] == 3
-

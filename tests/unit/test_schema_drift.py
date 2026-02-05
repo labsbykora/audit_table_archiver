@@ -88,7 +88,9 @@ def test_compare_schemas_column_removed(detector: SchemaDriftDetector, base_sche
     assert any("Column removed: name" in change for change in result["changes"])
 
 
-def test_compare_schemas_column_type_changed(detector: SchemaDriftDetector, base_schema: dict) -> None:
+def test_compare_schemas_column_type_changed(
+    detector: SchemaDriftDetector, base_schema: dict
+) -> None:
     """Test detection of column type change."""
     current = copy.deepcopy(base_schema)
     current["columns"][1]["data_type"] = "varchar"
@@ -112,7 +114,9 @@ def test_compare_schemas_nullable_changed(detector: SchemaDriftDetector, base_sc
     assert any("Column nullable changed: name" in change for change in result["changes"])
 
 
-def test_compare_schemas_primary_key_changed(detector: SchemaDriftDetector, base_schema: dict) -> None:
+def test_compare_schemas_primary_key_changed(
+    detector: SchemaDriftDetector, base_schema: dict
+) -> None:
     """Test detection of primary key change."""
     current = base_schema.copy()
     current["primary_key"] = {"constraint_name": "pk_test2", "columns": ["id", "name"]}
@@ -124,7 +128,9 @@ def test_compare_schemas_primary_key_changed(detector: SchemaDriftDetector, base
     assert any("Primary key changed" in change for change in result["changes"])
 
 
-def test_compare_schemas_foreign_key_added(detector: SchemaDriftDetector, base_schema: dict) -> None:
+def test_compare_schemas_foreign_key_added(
+    detector: SchemaDriftDetector, base_schema: dict
+) -> None:
     """Test detection of added foreign key."""
     current = base_schema.copy()
     current["foreign_keys"] = [
@@ -143,7 +149,9 @@ def test_compare_schemas_foreign_key_added(detector: SchemaDriftDetector, base_s
     assert any("Foreign key added: fk_test" in change for change in result["changes"])
 
 
-def test_compare_schemas_foreign_key_removed(detector: SchemaDriftDetector, base_schema: dict) -> None:
+def test_compare_schemas_foreign_key_removed(
+    detector: SchemaDriftDetector, base_schema: dict
+) -> None:
     """Test detection of removed foreign key."""
     previous = base_schema.copy()
     previous["foreign_keys"] = [
@@ -165,7 +173,9 @@ def test_compare_schemas_foreign_key_removed(detector: SchemaDriftDetector, base
 def test_compare_schemas_index_added(detector: SchemaDriftDetector, base_schema: dict) -> None:
     """Test detection of added index."""
     current = base_schema.copy()
-    current["indexes"] = [{"name": "idx_name", "definition": "CREATE INDEX...", "columns": ["name"]}]
+    current["indexes"] = [
+        {"name": "idx_name", "definition": "CREATE INDEX...", "columns": ["name"]}
+    ]
 
     result = detector.compare_schemas(current, base_schema, "test_db", "test_table")
 
@@ -176,7 +186,9 @@ def test_compare_schemas_index_added(detector: SchemaDriftDetector, base_schema:
 def test_compare_schemas_index_removed(detector: SchemaDriftDetector, base_schema: dict) -> None:
     """Test detection of removed index."""
     previous = base_schema.copy()
-    previous["indexes"] = [{"name": "idx_name", "definition": "CREATE INDEX...", "columns": ["name"]}]
+    previous["indexes"] = [
+        {"name": "idx_name", "definition": "CREATE INDEX...", "columns": ["name"]}
+    ]
 
     result = detector.compare_schemas(base_schema, previous, "test_db", "test_table")
 
@@ -184,7 +196,9 @@ def test_compare_schemas_index_removed(detector: SchemaDriftDetector, base_schem
     assert any("Index removed: idx_name" in change for change in result["changes"])
 
 
-def test_compare_schemas_fail_on_drift(strict_detector: SchemaDriftDetector, base_schema: dict) -> None:
+def test_compare_schemas_fail_on_drift(
+    strict_detector: SchemaDriftDetector, base_schema: dict
+) -> None:
     """Test that strict detector raises exception on drift."""
     current = copy.deepcopy(base_schema)
     current["columns"].append({"name": "email", "data_type": "text", "is_nullable": True})

@@ -66,9 +66,11 @@ def test_restore_main_missing_s3_key(runner: CliRunner, mock_config_file: Path) 
 
 def test_restore_main_success(runner: CliRunner, mock_config_file: Path) -> None:
     """Test successful restore execution."""
-    with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
-         patch("restore.main.DatabaseManager") as mock_db_class, \
-         patch("restore.main.RestoreEngine") as mock_engine_class:
+    with (
+        patch("restore.main.S3ArchiveReader") as mock_reader_class,
+        patch("restore.main.DatabaseManager") as mock_db_class,
+        patch("restore.main.RestoreEngine") as mock_engine_class,
+    ):
 
         # Mock archive file
         mock_archive = MagicMock()
@@ -90,11 +92,13 @@ def test_restore_main_success(runner: CliRunner, mock_config_file: Path) -> None
 
         # Mock restore engine
         mock_engine = MagicMock()
-        mock_engine.restore_archive = AsyncMock(return_value={
-            "records_restored": 100,
-            "records_processed": 100,
-            "records_failed": 0,
-        })
+        mock_engine.restore_archive = AsyncMock(
+            return_value={
+                "records_restored": 100,
+                "records_processed": 100,
+                "records_failed": 0,
+            }
+        )
         mock_engine_class.return_value = mock_engine
 
         result = runner.invoke(
@@ -142,9 +146,11 @@ def test_restore_main_dry_run(runner: CliRunner, mock_config_file: Path) -> None
 
 def test_restore_main_with_conflict_strategy(runner: CliRunner, mock_config_file: Path) -> None:
     """Test restore with conflict strategy."""
-    with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
-         patch("restore.main.DatabaseManager") as mock_db_class, \
-         patch("restore.main.RestoreEngine") as mock_engine_class:
+    with (
+        patch("restore.main.S3ArchiveReader") as mock_reader_class,
+        patch("restore.main.DatabaseManager") as mock_db_class,
+        patch("restore.main.RestoreEngine") as mock_engine_class,
+    ):
 
         mock_archive = MagicMock()
         mock_archive.record_count = 100
@@ -183,9 +189,11 @@ def test_restore_main_with_conflict_strategy(runner: CliRunner, mock_config_file
 
 def test_restore_main_with_schema_migration(runner: CliRunner, mock_config_file: Path) -> None:
     """Test restore with schema migration strategy."""
-    with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
-         patch("restore.main.DatabaseManager") as mock_db_class, \
-         patch("restore.main.RestoreEngine") as mock_engine_class:
+    with (
+        patch("restore.main.S3ArchiveReader") as mock_reader_class,
+        patch("restore.main.DatabaseManager") as mock_db_class,
+        patch("restore.main.RestoreEngine") as mock_engine_class,
+    ):
 
         mock_archive = MagicMock()
         mock_archive.record_count = 100
@@ -250,9 +258,11 @@ def test_restore_main_database_not_found(runner: CliRunner, mock_config_file: Pa
 
 def test_restore_main_extract_db_table_from_key(runner: CliRunner, mock_config_file: Path) -> None:
     """Test restore extracts database and table from S3 key."""
-    with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
-         patch("restore.main.DatabaseManager") as mock_db_class, \
-         patch("restore.main.RestoreEngine") as mock_engine_class:
+    with (
+        patch("restore.main.S3ArchiveReader") as mock_reader_class,
+        patch("restore.main.DatabaseManager") as mock_db_class,
+        patch("restore.main.RestoreEngine") as mock_engine_class,
+    ):
 
         mock_archive = MagicMock()
         mock_archive.record_count = 100
@@ -287,9 +297,11 @@ def test_restore_main_extract_db_table_from_key(runner: CliRunner, mock_config_f
 
 def test_restore_main_with_options(runner: CliRunner, mock_config_file: Path) -> None:
     """Test restore with various options."""
-    with patch("restore.main.S3ArchiveReader") as mock_reader_class, \
-         patch("restore.main.DatabaseManager") as mock_db_class, \
-         patch("restore.main.RestoreEngine") as mock_engine_class:
+    with (
+        patch("restore.main.S3ArchiveReader") as mock_reader_class,
+        patch("restore.main.DatabaseManager") as mock_db_class,
+        patch("restore.main.RestoreEngine") as mock_engine_class,
+    ):
 
         mock_archive = MagicMock()
         mock_archive.record_count = 100
@@ -338,4 +350,3 @@ def test_restore_main_with_options(runner: CliRunner, mock_config_file: Path) ->
         assert call_args[1]["drop_indexes"] is True
         assert call_args[1]["commit_frequency"] == 10
         assert call_args[1]["detect_conflicts"] is False
-

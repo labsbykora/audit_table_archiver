@@ -180,9 +180,7 @@ class HealthChecker:
         try:
             # Try to list bucket (lightweight operation)
             start_time = datetime.now(timezone.utc)
-            s3_client.client.list_objects_v2(
-                Bucket=s3_client.config.bucket, MaxKeys=1
-            )
+            s3_client.client.list_objects_v2(Bucket=s3_client.config.bucket, MaxKeys=1)
             duration = (datetime.now(timezone.utc) - start_time).total_seconds()
 
             return {
@@ -198,4 +196,3 @@ class HealthChecker:
                 "bucket": s3_client.config.bucket,
                 "error": str(e),
             }
-

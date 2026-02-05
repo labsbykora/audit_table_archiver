@@ -162,6 +162,7 @@ async def test_full_archival_dry_run(
     # db_connection fixture is auto-discovered by pytest
     # Use direct connection for verification
     import asyncpg
+
     conn = await asyncpg.connect(
         host="localhost",
         port=5432,
@@ -266,6 +267,7 @@ async def test_verification_failure_prevents_delete(
 
         # Verify records still in database (not deleted due to failure)
         import asyncpg
+
         conn = await asyncpg.connect(
             host="localhost",
             port=5432,
@@ -279,4 +281,3 @@ async def test_verification_failure_prevents_delete(
             assert count >= 0  # At least some records should remain
         finally:
             await conn.close()
-

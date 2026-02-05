@@ -158,9 +158,7 @@ class TestRestoreEngine:
     ) -> None:
         """Test restore with fail conflict strategy."""
         mock_conn = MagicMock()
-        mock_conn.executemany = AsyncMock(
-            side_effect=asyncpg.UniqueViolationError("duplicate key")
-        )
+        mock_conn.executemany = AsyncMock(side_effect=asyncpg.UniqueViolationError("duplicate key"))
         mock_conn.transaction = MagicMock()
         mock_conn.transaction.return_value.__aenter__ = AsyncMock(return_value=None)
         mock_conn.transaction.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -286,4 +284,3 @@ class TestRestoreEngine:
 
         assert stats["records_processed"] == 0
         assert stats["records_restored"] == 0
-

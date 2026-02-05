@@ -35,7 +35,7 @@ class TestLocalFallback:
 
     def test_save_failed_upload(self, fallback, fallback_dir):
         """Test saving failed upload."""
-        with tempfile.NamedTemporaryFile(delete=False, mode='wb') as f:
+        with tempfile.NamedTemporaryFile(delete=False, mode="wb") as f:
             f.write(b"test data")
             file_path = Path(f.name)
 
@@ -69,11 +69,14 @@ class TestLocalFallback:
         # Create metadata
         metadata_file = test_file.with_suffix(test_file.suffix + ".meta.json")
         with open(metadata_file, "w") as f:
-            json.dump({
-                "s3_key": "test/key",
-                "saved_at": datetime.now(timezone.utc).isoformat(),
-                "file_size": 9,
-            }, f)
+            json.dump(
+                {
+                    "s3_key": "test/key",
+                    "saved_at": datetime.now(timezone.utc).isoformat(),
+                    "file_size": 9,
+                },
+                f,
+            )
 
         uploads = fallback.list_failed_uploads()
         assert len(uploads) == 1
@@ -90,11 +93,14 @@ class TestLocalFallback:
         metadata_file = old_file.with_suffix(old_file.suffix + ".meta.json")
         old_time = datetime.now(timezone.utc) - timedelta(days=10)
         with open(metadata_file, "w") as f:
-            json.dump({
-                "s3_key": "old/key",
-                "saved_at": old_time.isoformat(),
-                "file_size": 9,
-            }, f)
+            json.dump(
+                {
+                    "s3_key": "old/key",
+                    "saved_at": old_time.isoformat(),
+                    "file_size": 9,
+                },
+                f,
+            )
 
         # Should not appear in list (older than 7 days default retention)
         uploads = fallback.list_failed_uploads()
@@ -109,6 +115,7 @@ class TestLocalFallback:
         old_time = (datetime.now(timezone.utc) - timedelta(days=10)).timestamp()
         old_file.touch()
         import os
+
         os.utime(old_file, (old_time, old_time))
 
         metadata_file = old_file.with_suffix(old_file.suffix + ".meta.json")
@@ -127,6 +134,7 @@ class TestLocalFallback:
         old_time = (datetime.now(timezone.utc) - timedelta(days=10)).timestamp()
         old_file.touch()
         import os
+
         os.utime(old_file, (old_time, old_time))
 
         stats = fallback.cleanup_old_uploads(dry_run=True)
@@ -142,15 +150,17 @@ class TestLocalFallback:
 
         metadata_file = test_file.with_suffix(test_file.suffix + ".meta.json")
         with open(metadata_file, "w") as f:
-            json.dump({
-                "s3_key": "test/key",
-                "saved_at": datetime.now(timezone.utc).isoformat(),
-                "file_size": 900,
-            }, f)
+            json.dump(
+                {
+                    "s3_key": "test/key",
+                    "saved_at": datetime.now(timezone.utc).isoformat(),
+                    "file_size": 900,
+                },
+                f,
+            )
 
         info = fallback.get_resume_info()
         assert info["total_failed"] == 1
         assert info["total_size"] == 900
         assert len(info["uploads"]) == 1
         assert info["uploads"][0]["s3_key"] == "test/key"
-

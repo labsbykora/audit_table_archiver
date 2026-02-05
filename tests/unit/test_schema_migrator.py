@@ -78,9 +78,7 @@ class TestSchemaDiff:
 class TestSchemaMigrator:
     """Tests for SchemaMigrator class."""
 
-    def test_compare_schemas_no_changes(
-        self, archived_schema: dict, current_schema: dict
-    ) -> None:
+    def test_compare_schemas_no_changes(self, archived_schema: dict, current_schema: dict) -> None:
         """Test schema comparison with no changes."""
         migrator = SchemaMigrator()
 
@@ -116,9 +114,7 @@ class TestSchemaMigrator:
         assert len(diff.removed_columns) == 1
         assert diff.removed_columns[0]["name"] == "email"
 
-    def test_compare_schemas_type_change(
-        self, archived_schema: dict, current_schema: dict
-    ) -> None:
+    def test_compare_schemas_type_change(self, archived_schema: dict, current_schema: dict) -> None:
         """Test schema comparison with type change."""
         migrator = SchemaMigrator()
 
@@ -218,7 +214,9 @@ class TestSchemaMigrator:
 
         # Amount should be converted from string to float
         assert "amount" in transformed
-        assert isinstance(transformed["amount"], (float, str))  # Could be either depending on conversion
+        assert isinstance(
+            transformed["amount"], (float, str)
+        )  # Could be either depending on conversion
 
     def test_transform_record_strict_mode_type_change(
         self, archived_schema: dict, current_schema: dict
@@ -305,4 +303,3 @@ class TestSchemaMigrator:
         assert diff.nullable_changes[0]["column"] == "id"
         assert diff.nullable_changes[0]["archived_nullable"] is True
         assert diff.nullable_changes[0]["current_nullable"] is False
-

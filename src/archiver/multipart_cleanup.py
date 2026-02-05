@@ -233,4 +233,3 @@ class MultipartCleanup:
         """
         prefix = f"{database_name}/{table_name}/"
         return await self.cleanup_orphaned_uploads(prefix=prefix, dry_run=dry_run)
-

@@ -188,4 +188,3 @@ class S3RateLimiter:
             "current_rate": self.token_bucket.refill_rate,
             "available_tokens": self.token_bucket.tokens,
         }
-

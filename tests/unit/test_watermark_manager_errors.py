@@ -52,9 +52,7 @@ async def test_save_watermark_s3_missing_client() -> None:
     manager = WatermarkManager(storage_type="s3")
 
     with pytest.raises(ValueError, match="s3_client is required"):
-        await manager.save_watermark(
-            "db1", "table1", datetime.now(timezone.utc), 123
-        )
+        await manager.save_watermark("db1", "table1", datetime.now(timezone.utc), 123)
 
 
 @pytest.mark.asyncio
@@ -63,9 +61,7 @@ async def test_save_watermark_database_missing_manager() -> None:
     manager = WatermarkManager(storage_type="database")
 
     with pytest.raises(ValueError, match="db_manager is required"):
-        await manager.save_watermark(
-            "db1", "table1", datetime.now(timezone.utc), 123
-        )
+        await manager.save_watermark("db1", "table1", datetime.now(timezone.utc), 123)
 
 
 @pytest.mark.asyncio
@@ -112,9 +108,7 @@ async def test_load_watermark_database_not_found(mock_db_manager: MagicMock) -> 
 
     mock_db_manager.fetchone = AsyncMock(return_value=None)
 
-    result = await manager.load_watermark(
-        "db1", "table1", db_manager=mock_db_manager
-    )
+    result = await manager.load_watermark("db1", "table1", db_manager=mock_db_manager)
     assert result is None
 
 
@@ -150,4 +144,3 @@ def test_invalid_storage_type() -> None:
     """Test initialization with invalid storage type."""
     with pytest.raises(ValueError, match="Invalid storage_type"):
         WatermarkManager(storage_type="invalid")
-

@@ -99,4 +99,3 @@ class RetentionPolicyEnforcer:
             min_retention=min_retention,
             max_retention=max_retention,
         )
-

@@ -57,17 +57,21 @@ async def test_detect_table_schema(mock_db_manager):
     unique_data = []
 
     # Primary key uses fetchone(), not fetch()
-    mock_db_manager.fetchone = AsyncMock(return_value={
-        "constraint_name": "test_table_pkey",
-        "columns": ["id"],
-    })
-    mock_db_manager.fetch = AsyncMock(side_effect=[
-        columns_data,  # First call for columns
-        fk_data,  # Second call for foreign keys
-        indexes_data,  # Third call for indexes
-        check_data,  # Fourth call for check constraints
-        unique_data,  # Fifth call for unique constraints
-    ])
+    mock_db_manager.fetchone = AsyncMock(
+        return_value={
+            "constraint_name": "test_table_pkey",
+            "columns": ["id"],
+        }
+    )
+    mock_db_manager.fetch = AsyncMock(
+        side_effect=[
+            columns_data,  # First call for columns
+            fk_data,  # Second call for foreign keys
+            indexes_data,  # Third call for indexes
+            check_data,  # Fourth call for check constraints
+            unique_data,  # Fifth call for unique constraints
+        ]
+    )
 
     detector = SchemaDetector()
 
@@ -107,13 +111,15 @@ async def test_detect_table_schema_no_primary_key(mock_db_manager):
 
     # Primary key uses fetchone(), not fetch()
     mock_db_manager.fetchone = AsyncMock(return_value=None)  # No primary key
-    mock_db_manager.fetch = AsyncMock(side_effect=[
-        columns_data,  # Columns
-        [],  # Foreign keys
-        [],  # Indexes
-        [],  # Check constraints
-        [],  # Unique constraints
-    ])
+    mock_db_manager.fetch = AsyncMock(
+        side_effect=[
+            columns_data,  # Columns
+            [],  # Foreign keys
+            [],  # Indexes
+            [],  # Check constraints
+            [],  # Unique constraints
+        ]
+    )
 
     detector = SchemaDetector()
 
@@ -155,10 +161,12 @@ async def test_detect_table_schema_with_foreign_keys(mock_db_manager):
     ]
 
     # Primary key uses fetchone(), not fetch()
-    mock_db_manager.fetchone = AsyncMock(return_value={
-        "constraint_name": "test_table_pkey",
-        "columns": ["id"],
-    })
+    mock_db_manager.fetchone = AsyncMock(
+        return_value={
+            "constraint_name": "test_table_pkey",
+            "columns": ["id"],
+        }
+    )
 
     # Foreign key query returns rows with these fields
     fk_data = [
@@ -171,13 +179,15 @@ async def test_detect_table_schema_with_foreign_keys(mock_db_manager):
         }
     ]
 
-    mock_db_manager.fetch = AsyncMock(side_effect=[
-        columns_data,  # Columns
-        fk_data,  # Foreign keys
-        [],  # Indexes
-        [],  # Check constraints
-        [],  # Unique constraints
-    ])
+    mock_db_manager.fetch = AsyncMock(
+        side_effect=[
+            columns_data,  # Columns
+            fk_data,  # Foreign keys
+            [],  # Indexes
+            [],  # Check constraints
+            [],  # Unique constraints
+        ]
+    )
 
     detector = SchemaDetector()
 
@@ -190,4 +200,3 @@ async def test_detect_table_schema_with_foreign_keys(mock_db_manager):
     assert len(schema["foreign_keys"]) == 1
     assert schema["foreign_keys"][0]["constraint_name"] == "test_table_user_id_fkey"
     assert schema["foreign_keys"][0]["referenced_table"] == "users"
-

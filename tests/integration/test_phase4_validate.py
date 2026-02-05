@@ -30,21 +30,30 @@ async def test_validate_archive_integration(
     )
 
     # Get data from database
-    rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
+    rows = await db_connection.fetch(
+        f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id"
+    )
 
     # Create valid archive
     jsonl_content = "\n".join(
-        json.dumps({
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "action": row["action"],
-            "metadata": row["metadata"],
-            "created_at": row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-        })
+        json.dumps(
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "action": row["action"],
+                "metadata": row["metadata"],
+                "created_at": (
+                    row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else str(row["created_at"])
+                ),
+            }
+        )
         for row in rows
     )
 
     import gzip
+
     jsonl_bytes = jsonl_content.encode("utf-8")
     compressed = gzip.compress(jsonl_bytes)
 
@@ -64,22 +73,22 @@ async def test_validate_archive_integration(
         )
 
         metadata = {
-        "batch_info": {
-            "batch_id": "valid_archive",
-            "database": "test_db",
-            "schema": "public",
-            "table": test_table,
-            "archived_at": datetime.now(timezone.utc).isoformat(),
-        },
-        "data_info": {
-            "record_count": len(rows),
-            "total_size_bytes": len(compressed),
-            "compression": "gzip",
-        },
-        "checksums": {
-            "jsonl_sha256": checksum,
-        },
-    }
+            "batch_info": {
+                "batch_id": "valid_archive",
+                "database": "test_db",
+                "schema": "public",
+                "table": test_table,
+                "archived_at": datetime.now(timezone.utc).isoformat(),
+            },
+            "data_info": {
+                "record_count": len(rows),
+                "total_size_bytes": len(compressed),
+                "compression": "gzip",
+            },
+            "checksums": {
+                "jsonl_sha256": checksum,
+            },
+        }
 
         metadata_key = s3_key.replace(".jsonl.gz", ".metadata.json")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w") as meta_file:
@@ -121,20 +130,29 @@ async def test_validate_archive_checksum_mismatch(
     )
 
     # Get data from database
-    rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
+    rows = await db_connection.fetch(
+        f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id"
+    )
 
     jsonl_content = "\n".join(
-        json.dumps({
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "action": row["action"],
-            "metadata": row["metadata"],
-            "created_at": row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-        })
+        json.dumps(
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "action": row["action"],
+                "metadata": row["metadata"],
+                "created_at": (
+                    row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else str(row["created_at"])
+                ),
+            }
+        )
         for row in rows
     )
 
     import gzip
+
     compressed = gzip.compress(jsonl_content.encode("utf-8"))
 
     # Use wrong checksum
@@ -142,6 +160,7 @@ async def test_validate_archive_checksum_mismatch(
 
     # Upload data file - write to temp file first
     import tempfile
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
         tmp_file.write(compressed)
         tmp_file_path = Path(tmp_file.name)
@@ -216,22 +235,31 @@ async def test_validate_archive_record_count_mismatch(
     )
 
     # Get data from database
-    all_rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
-    half_rows = all_rows[:len(all_rows)//2]  # Only half the records
+    all_rows = await db_connection.fetch(
+        f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id"
+    )
+    half_rows = all_rows[: len(all_rows) // 2]  # Only half the records
 
     # Create archive with fewer records than metadata claims
     jsonl_content = "\n".join(
-        json.dumps({
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "action": row["action"],
-            "metadata": row["metadata"],
-            "created_at": row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-        })
+        json.dumps(
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "action": row["action"],
+                "metadata": row["metadata"],
+                "created_at": (
+                    row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else str(row["created_at"])
+                ),
+            }
+        )
         for row in half_rows
     )
 
     import gzip
+
     jsonl_bytes = jsonl_content.encode("utf-8")
     compressed = gzip.compress(jsonl_bytes)
 
@@ -240,6 +268,7 @@ async def test_validate_archive_record_count_mismatch(
 
     # Upload data file - write to temp file first
     import tempfile
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl.gz") as tmp_file:
         tmp_file.write(compressed)
         tmp_file_path = Path(tmp_file.name)
@@ -310,24 +339,33 @@ async def test_validate_all_archives(
     )
 
     # Get data from database
-    base_rows = await db_connection.fetch(f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id")
+    base_rows = await db_connection.fetch(
+        f"SELECT id, user_id, action, metadata, created_at FROM {test_table} ORDER BY id"
+    )
 
     # Create multiple archives
     temp_files = []
     try:
         for i in range(3):
             jsonl_content = "\n".join(
-                json.dumps({
-                    "id": row["id"] + i * 1000,
-                    "user_id": row["user_id"],
-                    "action": row["action"],
-                    "metadata": row["metadata"],
-                    "created_at": row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-                })
+                json.dumps(
+                    {
+                        "id": row["id"] + i * 1000,
+                        "user_id": row["user_id"],
+                        "action": row["action"],
+                        "metadata": row["metadata"],
+                        "created_at": (
+                            row["created_at"].isoformat()
+                            if isinstance(row["created_at"], datetime)
+                            else str(row["created_at"])
+                        ),
+                    }
+                )
                 for row in base_rows
             )
 
             import gzip
+
             jsonl_bytes = jsonl_content.encode("utf-8")
             compressed = gzip.compress(jsonl_bytes)
 
@@ -391,4 +429,3 @@ async def test_validate_all_archives(
     assert result.total_archives == 3
     assert result.valid_archives == 3
     assert result.invalid_archives == 0
-

@@ -444,13 +444,16 @@ async def test_database_manager_transaction(db_config: DatabaseConfig) -> None:
 
     mock_pool = AsyncMock()
     mock_conn = AsyncMock()
+
     async def aenter(self):
         return mock_conn
+
     async def aexit(self, exc_type, exc_val, exc_tb):
         return None
 
     async def tenter(self):
         return mock_conn
+
     async def texit(self, exc_type, exc_val, exc_tb):
         return None
 
@@ -471,4 +474,3 @@ async def test_database_manager_transaction(db_config: DatabaseConfig) -> None:
         assert conn == mock_conn
 
     mock_conn.transaction.assert_called_once()
-

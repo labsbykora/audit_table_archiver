@@ -159,7 +159,7 @@ class S3ArchiveReader:
             if self.s3_config.prefix:
                 prefix = self.s3_config.prefix.rstrip("/")
                 if s3_key.startswith(prefix + "/"):
-                    alt_key = s3_key[len(prefix) + 1:].replace(".jsonl.gz", ".metadata.json")
+                    alt_key = s3_key[len(prefix) + 1 :].replace(".jsonl.gz", ".metadata.json")
                     alternative_keys.append(alt_key)
 
             # Try each alternative
@@ -169,7 +169,9 @@ class S3ArchiveReader:
                         self.logger.debug("Trying alternative metadata key", metadata_key=alt_key)
                         metadata_bytes = self.s3_client.get_object_bytes(alt_key)
                         metadata = json.loads(metadata_bytes.decode("utf-8"))
-                        self.logger.debug("Metadata file found with alternative key", metadata_key=alt_key)
+                        self.logger.debug(
+                            "Metadata file found with alternative key", metadata_key=alt_key
+                        )
                         metadata_key = alt_key  # Update metadata_key for consistency
                         break
                     except Exception:
@@ -198,7 +200,7 @@ class S3ArchiveReader:
             if self.s3_config.prefix:
                 prefix = self.s3_config.prefix.rstrip("/")
                 if s3_key.startswith(prefix + "/"):
-                    alt_key = s3_key[len(prefix) + 1:]
+                    alt_key = s3_key[len(prefix) + 1 :]
                     alternative_keys.append(alt_key)
 
             # Try with schema name inserted: archives/db/public/table/...
@@ -225,9 +227,7 @@ class S3ArchiveReader:
 
             if compressed_data is None:
                 # Provide helpful error message
-                error_msg = (
-                    f"Failed to read data file from S3. Tried key: {s3_key}"
-                )
+                error_msg = f"Failed to read data file from S3. Tried key: {s3_key}"
                 if alternative_keys:
                     error_msg += f" and alternatives: {alternative_keys}"
                 # Try to extract database and table from key for helpful error message
@@ -338,9 +338,7 @@ class S3ArchiveReader:
         expected_compressed_checksum = checksums.get("compressed_sha256")
 
         if expected_jsonl_checksum:
-            if not self.checksum_calculator.verify_checksum(
-                jsonl_data, expected_jsonl_checksum
-            ):
+            if not self.checksum_calculator.verify_checksum(jsonl_data, expected_jsonl_checksum):
                 actual_checksum = self.checksum_calculator.calculate_sha256(jsonl_data)
                 raise S3Error(
                     f"JSONL checksum mismatch: expected {expected_jsonl_checksum}, got {actual_checksum}",
@@ -477,7 +475,10 @@ class S3ArchiveReader:
                                                     continue
                                             if end_date:
                                                 end = end_date.replace(
-                                                    hour=23, minute=59, second=59, microsecond=999999
+                                                    hour=23,
+                                                    minute=59,
+                                                    second=59,
+                                                    microsecond=999999,
                                                 )
                                                 if end.tzinfo is None:
                                                     end = end.replace(tzinfo=timezone.utc)
@@ -500,4 +501,3 @@ class S3ArchiveReader:
                 f"Failed to list archives: {e}",
                 context={"prefix": prefix},
             ) from e
-

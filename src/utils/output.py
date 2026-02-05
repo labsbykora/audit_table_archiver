@@ -30,7 +30,9 @@ def print_section(title: str, color: str = "yellow") -> None:
     click.echo(click.style(f"\n{title}:", fg=color, bold=True))
 
 
-def print_key_value(key: str, value: Any, key_color: str = "white", value_color: str = "cyan") -> None:
+def print_key_value(
+    key: str, value: Any, key_color: str = "white", value_color: str = "cyan"
+) -> None:
     """Print a key-value pair.
 
     Args:
@@ -137,7 +139,10 @@ def print_summary(stats: dict[str, Any], title: str = "Summary") -> None:
             records_archived_this_run = stats.get("records_archived", 0)
         records_archived_total = stats.get("records_archived_total")
 
-        if records_archived_total is not None and records_archived_total > records_archived_this_run:
+        if (
+            records_archived_total is not None
+            and records_archived_total > records_archived_this_run
+        ):
             # Both metrics available and different - show both
             print_key_value("Archived (This Run)", f"{records_archived_this_run:,}")
             print_key_value("Archived (Total)", f"{records_archived_total:,}")
@@ -152,6 +157,7 @@ def print_summary(stats: dict[str, Any], title: str = "Summary") -> None:
 
         if stats.get("start_time") and stats.get("end_time"):
             from datetime import datetime
+
             start = datetime.fromisoformat(stats["start_time"].replace("Z", "+00:00"))
             end = datetime.fromisoformat(stats["end_time"].replace("Z", "+00:00"))
             duration = (end - start).total_seconds()
@@ -194,4 +200,3 @@ def print_delimiter(width: int = 70) -> None:
         width: Delimiter width
     """
     click.echo(click.style("-" * width, dim=True))
-

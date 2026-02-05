@@ -217,7 +217,13 @@ class RestoreEngine:
         else:
             conflict_resolver = None
 
-        if detect_conflicts and primary_key and not dry_run and self.conflict_detector and conflict_resolver:
+        if (
+            detect_conflicts
+            and primary_key
+            and not dry_run
+            and self.conflict_detector
+            and conflict_resolver
+        ):
             try:
                 conflict_report = await self.conflict_detector.detect_conflicts(
                     records=records,
@@ -264,7 +270,7 @@ class RestoreEngine:
 
         # Safely extract conflict types
         conflict_types_dict = {}
-        if conflict_report and hasattr(conflict_report, 'conflict_types'):
+        if conflict_report and hasattr(conflict_report, "conflict_types"):
             conflict_types_dict = conflict_report.conflict_types or {}
 
         stats = {
@@ -274,7 +280,11 @@ class RestoreEngine:
             "records_failed": records_failed_count,
             "conflicts_detected": conflict_report.total_conflicts if conflict_report else 0,
             "conflict_types": conflict_types_dict,
-            "skip_reason": "conflict" if conflict_report and conflict_report.has_conflicts and conflict_strategy == "skip" else None,
+            "skip_reason": (
+                "conflict"
+                if conflict_report and conflict_report.has_conflicts and conflict_strategy == "skip"
+                else None
+            ),
         }
 
         # Update data_columns after transformation (in case columns were added/removed)
@@ -348,7 +358,9 @@ class RestoreEngine:
                     # Update skipped records count (for skip strategy, already calculated above)
                     # If all records were filtered out due to conflicts, this is already set
                     # Otherwise, update based on actual restored count
-                    if conflict_strategy == "skip" and not (conflict_report and conflict_report.has_conflicts):
+                    if conflict_strategy == "skip" and not (
+                        conflict_report and conflict_report.has_conflicts
+                    ):
                         # Only update if conflicts weren't already handled in filtering
                         stats["records_skipped"] = original_record_count - restored
 
@@ -453,7 +465,9 @@ class RestoreEngine:
             try:
                 await conn.execute(f"DROP INDEX IF EXISTS {schema}.{idx['indexname']}")
                 dropped.append({"name": idx["indexname"], "def": idx["indexdef"]})
-                self.logger.debug("Dropped index", schema=schema, table=table, index=idx["indexname"])
+                self.logger.debug(
+                    "Dropped index", schema=schema, table=table, index=idx["indexname"]
+                )
             except Exception as e:
                 self.logger.warning(
                     "Failed to drop index",
@@ -521,7 +535,9 @@ class RestoreEngine:
         for i in range(0, len(records), batch_size):
             batch_num += 1
             batch = records[i : i + batch_size]
-            batch_values = [self._prepare_record_values(record, columns, current_schema) for record in batch]
+            batch_values = [
+                self._prepare_record_values(record, columns, current_schema) for record in batch
+            ]
 
             # Use transaction for each batch (or group of batches based on commit_frequency)
             async with conn.transaction():
@@ -589,7 +605,9 @@ class RestoreEngine:
         for i in range(0, len(records), batch_size):
             batch_num += 1
             batch = records[i : i + batch_size]
-            batch_values = [self._prepare_record_values(record, columns, current_schema) for record in batch]
+            batch_values = [
+                self._prepare_record_values(record, columns, current_schema) for record in batch
+            ]
 
             async with conn.transaction():
                 result = await conn.executemany(insert_query, batch_values)
@@ -646,7 +664,9 @@ class RestoreEngine:
         for i in range(0, len(records), batch_size):
             batch_num += 1
             batch = records[i : i + batch_size]
-            batch_values = [self._prepare_record_values(record, columns, current_schema) for record in batch]
+            batch_values = [
+                self._prepare_record_values(record, columns, current_schema) for record in batch
+            ]
 
             async with conn.transaction():
                 try:
@@ -697,10 +717,20 @@ class RestoreEngine:
         """
         # Upsert is same as overwrite for now
         return await self._restore_with_copy_overwrite(
-            conn, schema, table, records, columns, column_types, batch_size, commit_frequency, current_schema
+            conn,
+            schema,
+            table,
+            records,
+            columns,
+            column_types,
+            batch_size,
+            commit_frequency,
+            current_schema,
         )
 
-    def _is_column_timezone_aware(self, column_name: str, current_schema: Optional[dict[str, Any]]) -> bool:
+    def _is_column_timezone_aware(
+        self, column_name: str, current_schema: Optional[dict[str, Any]]
+    ) -> bool:
         """Check if a column is timezone-aware (TIMESTAMPTZ).
 
         Args:
@@ -722,7 +752,10 @@ class RestoreEngine:
         return False  # Default to timezone-naive if column not found
 
     def _prepare_record_values(
-        self, record: dict[str, Any], columns: list[str], current_schema: Optional[dict[str, Any]] = None
+        self,
+        record: dict[str, Any],
+        columns: list[str],
+        current_schema: Optional[dict[str, Any]] = None,
     ) -> list[Any]:
         """Prepare record values for INSERT.
 
@@ -783,4 +816,3 @@ class RestoreEngine:
                 values.append(str(value))
 
         return values
-

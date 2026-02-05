@@ -83,7 +83,6 @@ async def test_lock_heartbeat(postgres_ready, db_config):
     finally:
         await db_manager.disconnect()
 
-
     @pytest.mark.asyncio
     async def test_concurrent_lock_prevention(postgres_ready, db_config):
         """Test that concurrent runs are prevented by locking."""
@@ -201,4 +200,3 @@ async def test_stale_file_lock_cleanup(tmp_path):
     assert lock.owner != "old_owner"  # New lock with new owner
 
     await lock_manager.release_lock(lock, lock_file_path=lock_file_path)
-

@@ -74,7 +74,12 @@ class ArchiverMetrics:
         self.duration_seconds = Histogram(
             "archiver_duration_seconds",
             "Duration of operations in seconds",
-            ["database", "table", "schema", "phase"],  # phase: query, serialize, compress, upload, verify, delete, vacuum
+            [
+                "database",
+                "table",
+                "schema",
+                "phase",
+            ],  # phase: query, serialize, compress, upload, verify, delete, vacuum
             buckets=[0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0],
             registry=self.registry,
         )
@@ -154,12 +159,10 @@ class ArchiverMetrics:
             count: Number of records archived
             bytes_uploaded: Bytes uploaded to S3
         """
-        self.records_archived_total.labels(
-            database=database, table=table, schema=schema
-        ).inc(count)
-        self.bytes_uploaded_total.labels(
-            database=database, table=table, schema=schema
-        ).inc(bytes_uploaded)
+        self.records_archived_total.labels(database=database, table=table, schema=schema).inc(count)
+        self.bytes_uploaded_total.labels(database=database, table=table, schema=schema).inc(
+            bytes_uploaded
+        )
 
     def record_batch_processed(
         self,
@@ -178,9 +181,7 @@ class ArchiverMetrics:
             record_count: Number of records in batch
             duration_seconds: Time taken to process batch
         """
-        self.batches_processed_total.labels(
-            database=database, table=table, schema=schema
-        ).inc()
+        self.batches_processed_total.labels(database=database, table=table, schema=schema).inc()
 
         # Calculate and record processing rate
         if duration_seconds > 0:
@@ -280,13 +281,11 @@ class ArchiverMetrics:
             schema: Schema name
             bytes_reclaimed: Bytes reclaimed
         """
-        self.space_reclaimed_bytes.labels(
-            database=database, table=table, schema=schema
-        ).set(bytes_reclaimed)
+        self.space_reclaimed_bytes.labels(database=database, table=table, schema=schema).set(
+            bytes_reclaimed
+        )
 
-    def set_batch_progress(
-        self, database: str, table: str, schema: str, progress: float
-    ) -> None:
+    def set_batch_progress(self, database: str, table: str, schema: str, progress: float) -> None:
         """Set current batch progress.
 
         Args:
@@ -295,13 +294,11 @@ class ArchiverMetrics:
             schema: Schema name
             progress: Progress (0.0 to 1.0)
         """
-        self.current_batch_progress.labels(
-            database=database, table=table, schema=schema
-        ).set(progress)
+        self.current_batch_progress.labels(database=database, table=table, schema=schema).set(
+            progress
+        )
 
-    def set_records_eligible(
-        self, database: str, table: str, schema: str, count: int
-    ) -> None:
+    def set_records_eligible(self, database: str, table: str, schema: str, count: int) -> None:
         """Set number of records eligible for archival.
 
         Args:
@@ -310,9 +307,7 @@ class ArchiverMetrics:
             schema: Schema name
             count: Number of eligible records
         """
-        self.records_eligible.labels(
-            database=database, table=table, schema=schema
-        ).set(count)
+        self.records_eligible.labels(database=database, table=table, schema=schema).set(count)
 
     def start_phase_timer(self, phase: str) -> None:
         """Start timing a phase.
@@ -373,4 +368,3 @@ class ArchiverMetrics:
                 error=str(e),
             )
             raise
-

@@ -239,4 +239,3 @@ Daily archival summary for {datetime.now(timezone.utc).strftime('%Y-%m-%d')}
         }
 
         return subject, message.strip(), metadata
-

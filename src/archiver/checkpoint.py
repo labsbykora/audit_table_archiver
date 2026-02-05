@@ -72,11 +72,7 @@ class Checkpoint:
             "table": self.table_name,
             "schema": self.schema_name,
             "batch_number": self.batch_number,
-            "last_timestamp": (
-                self.last_timestamp.isoformat()
-                if self.last_timestamp
-                else None
-            ),
+            "last_timestamp": (self.last_timestamp.isoformat() if self.last_timestamp else None),
             "last_primary_key": (
                 str(self.last_primary_key) if self.last_primary_key is not None else None
             ),
@@ -116,9 +112,7 @@ class Checkpoint:
                 except (ValueError, AttributeError):
                     pass  # Keep as string if conversion fails
 
-            checkpoint_time = datetime.fromisoformat(
-                data["checkpoint_time"].replace("Z", "+00:00")
-            )
+            checkpoint_time = datetime.fromisoformat(data["checkpoint_time"].replace("Z", "+00:00"))
 
             return cls(
                 database_name=data["database"],
@@ -156,9 +150,7 @@ class CheckpointManager:
             logger: Optional logger instance
         """
         if storage_type not in ("s3", "local"):
-            raise ValueError(
-                f"Invalid storage_type: {storage_type}. Must be 's3' or 'local'"
-            )
+            raise ValueError(f"Invalid storage_type: {storage_type}. Must be 's3' or 'local'")
 
         self.storage_type = storage_type
         self.checkpoint_interval = checkpoint_interval
@@ -224,15 +216,11 @@ class CheckpointManager:
         if self.storage_type == "s3":
             if s3_client is None:
                 raise ValueError("s3_client is required for S3 storage type")
-            return await self._load_checkpoint_from_s3(
-                database_name, table_name, s3_client
-            )
+            return await self._load_checkpoint_from_s3(database_name, table_name, s3_client)
         else:  # local
             if local_path is None:
                 raise ValueError("local_path is required for local storage type")
-            return await self._load_checkpoint_from_local(
-                database_name, table_name, local_path
-            )
+            return await self._load_checkpoint_from_local(database_name, table_name, local_path)
 
     async def delete_checkpoint(
         self,
@@ -255,28 +243,20 @@ class CheckpointManager:
         if self.storage_type == "s3":
             if s3_client is None:
                 raise ValueError("s3_client is required for S3 storage type")
-            await self._delete_checkpoint_from_s3(
-                database_name, table_name, s3_client
-            )
+            await self._delete_checkpoint_from_s3(database_name, table_name, s3_client)
         else:  # local
             if local_path is None:
                 raise ValueError("local_path is required for local storage type")
-            await self._delete_checkpoint_from_local(
-                database_name, table_name, local_path
-            )
+            await self._delete_checkpoint_from_local(database_name, table_name, local_path)
 
-    async def _save_checkpoint_to_s3(
-        self, checkpoint: Checkpoint, s3_client: S3Client
-    ) -> None:
+    async def _save_checkpoint_to_s3(self, checkpoint: Checkpoint, s3_client: S3Client) -> None:
         """Save checkpoint to S3.
 
         Args:
             checkpoint: Checkpoint object
             s3_client: S3 client
         """
-        checkpoint_key = (
-            f"{checkpoint.database_name}/{checkpoint.table_name}/.checkpoint.json"
-        )
+        checkpoint_key = f"{checkpoint.database_name}/{checkpoint.table_name}/.checkpoint.json"
 
         checkpoint_json = json.dumps(checkpoint.to_dict(), indent=2, default=str)
 
@@ -367,9 +347,7 @@ class CheckpointManager:
 
         try:
             # Use S3Client's client property
-            s3_client.client.delete_object(
-                Bucket=s3_client.config.bucket, Key=checkpoint_key
-            )
+            s3_client.client.delete_object(Bucket=s3_client.config.bucket, Key=checkpoint_key)
             self.logger.info(
                 "Checkpoint deleted from S3",
                 database=database_name,
@@ -385,9 +363,7 @@ class CheckpointManager:
                     context={"key": checkpoint_key},
                 ) from e
 
-    async def _save_checkpoint_to_local(
-        self, checkpoint: Checkpoint, local_path: Path
-    ) -> None:
+    async def _save_checkpoint_to_local(self, checkpoint: Checkpoint, local_path: Path) -> None:
         """Save checkpoint to local file.
 
         Args:
@@ -395,8 +371,7 @@ class CheckpointManager:
             local_path: Directory path for checkpoint files
         """
         checkpoint_file = (
-            local_path
-            / f"{checkpoint.database_name}_{checkpoint.table_name}.checkpoint.json"
+            local_path / f"{checkpoint.database_name}_{checkpoint.table_name}.checkpoint.json"
         )
 
         # Ensure directory exists
@@ -487,4 +462,3 @@ class CheckpointManager:
                 f"Failed to delete checkpoint from local file: {e}",
                 context={"file": str(checkpoint_file)},
             ) from e
-

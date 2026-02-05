@@ -229,13 +229,9 @@ class TestRestoreWatermarkManager:
             "total_archives_restored": 5,
             "updated_at": "2026-01-08T10:00:00Z",
         }
-        s3_client.get_object_bytes = Mock(
-            return_value=json.dumps(watermark_data).encode("utf-8")
-        )
+        s3_client.get_object_bytes = Mock(return_value=json.dumps(watermark_data).encode("utf-8"))
 
-        result = await manager.load_watermark(
-            "test_db", "test_table", s3_client=s3_client
-        )
+        result = await manager.load_watermark("test_db", "test_table", s3_client=s3_client)
 
         assert result is not None
         assert result.database_name == "test_db"
@@ -253,9 +249,7 @@ class TestRestoreWatermarkManager:
         s3_client.config.prefix = "archives"
         s3_client.get_object_bytes = Mock(side_effect=S3Error("NoSuchKey", context={}))
 
-        result = await manager.load_watermark(
-            "test_db", "test_table", s3_client=s3_client
-        )
+        result = await manager.load_watermark("test_db", "test_table", s3_client=s3_client)
 
         assert result is None
 
@@ -307,9 +301,7 @@ class TestRestoreWatermarkManager:
             }
         )
 
-        result = await manager.load_watermark(
-            "test_db", "test_table", db_manager=db_manager
-        )
+        result = await manager.load_watermark("test_db", "test_table", db_manager=db_manager)
 
         assert result is not None
         assert result.database_name == "test_db"
@@ -325,9 +317,7 @@ class TestRestoreWatermarkManager:
         db_manager = Mock(spec=DatabaseManager)
         db_manager.fetchone = AsyncMock(return_value=None)
 
-        result = await manager.load_watermark(
-            "test_db", "test_table", db_manager=db_manager
-        )
+        result = await manager.load_watermark("test_db", "test_table", db_manager=db_manager)
 
         assert result is None
 
@@ -369,9 +359,7 @@ class TestRestoreWatermarkManager:
             "total_archives_restored": 5,
             "updated_at": "2026-01-08T10:00:00Z",
         }
-        s3_client.get_object_bytes = Mock(
-            return_value=json.dumps(watermark_data).encode("utf-8")
-        )
+        s3_client.get_object_bytes = Mock(return_value=json.dumps(watermark_data).encode("utf-8"))
 
         result = await manager.load_watermark(
             "test_db", "test_table", s3_client=s3_client, db_manager=None
@@ -452,4 +440,3 @@ class TestRestoreWatermarkManager:
                 5,
                 db_manager=None,
             )
-

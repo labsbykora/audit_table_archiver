@@ -175,4 +175,3 @@ class TestHealthCheckServer:
         assert data["service"] == "audit-archiver"
         assert "health_endpoint" in data
         assert "metrics_endpoint" in data
-

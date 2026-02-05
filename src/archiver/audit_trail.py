@@ -143,7 +143,9 @@ class AuditTrail:
             s3_key = f"audit/{date_partition}/{filename}"
 
         # Write event to temporary file
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".json", encoding="utf-8"
+        ) as tmp_file:
             tmp_path = Path(tmp_file.name)
             json.dump(event, tmp_file, indent=2, default=str)
 
@@ -165,9 +167,7 @@ class AuditTrail:
                     error=str(e),
                 )
 
-    async def _log_to_database(
-        self, event: dict[str, Any], db_manager: DatabaseManager
-    ) -> None:
+    async def _log_to_database(self, event: dict[str, Any], db_manager: DatabaseManager) -> None:
         """Log audit event to database.
 
         Args:
@@ -245,4 +245,3 @@ class AuditTrail:
                     "database": event["database"],
                 },
             ) from e
-

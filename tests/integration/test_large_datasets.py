@@ -116,9 +116,7 @@ async def test_checkpoint_resume_large_dataset(
     stats_resume = await archiver.archive()
 
     # Verify all records archived
-    total_archived = stats.get("records_archived", 0) + stats_resume.get(
-        "records_archived", 0
-    )
+    total_archived = stats.get("records_archived", 0) + stats_resume.get("records_archived", 0)
     assert total_archived == total_records
 
 
@@ -178,4 +176,3 @@ async def test_memory_usage_large_batch(
 
     # Verify all records archived
     assert stats["records_archived"] == total_records
-

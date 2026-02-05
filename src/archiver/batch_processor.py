@@ -80,9 +80,7 @@ class BatchProcessor:
         # Use database server time, not client time
         # For now, we'll use Python's UTC time and verify with database
         retention_days = self.table_config.retention_days or 90
-        cutoff = datetime.now(timezone.utc) - timedelta(
-            days=retention_days + safety_buffer_days
-        )
+        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days + safety_buffer_days)
         return cutoff
 
     async def calculate_cutoff_date_for_query(self, safety_buffer_days: int = 1) -> datetime:
@@ -271,9 +269,7 @@ class BatchProcessor:
 
         return last_timestamp, last_pk
 
-    def get_timestamp_range(
-        self, records: list[dict[str, Any]]
-    ) -> dict[str, Optional[datetime]]:
+    def get_timestamp_range(self, records: list[dict[str, Any]]) -> dict[str, Optional[datetime]]:
         """Get min and max timestamp from records.
 
         Args:
@@ -305,4 +301,3 @@ class BatchProcessor:
             return {"min": None, "max": None}
 
         return {"min": min(timestamps), "max": max(timestamps)}
-

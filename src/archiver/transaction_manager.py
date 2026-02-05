@@ -169,4 +169,3 @@ class TransactionManager:
             return None
 
         return (datetime.now() - self._transaction_start).total_seconds()
-

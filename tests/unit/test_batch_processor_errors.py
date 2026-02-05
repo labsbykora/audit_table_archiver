@@ -67,7 +67,9 @@ async def test_count_eligible_records_error(batch_processor: BatchProcessor) -> 
     """Test count_eligible_records with database error."""
     from archiver.exceptions import DatabaseError
 
-    batch_processor.db_manager.fetchval = AsyncMock(side_effect=asyncpg.PostgresError("Database error"))
+    batch_processor.db_manager.fetchval = AsyncMock(
+        side_effect=asyncpg.PostgresError("Database error")
+    )
 
     with pytest.raises(DatabaseError, match="Failed to count eligible records"):
         await batch_processor.count_eligible_records()
@@ -235,4 +237,3 @@ def test_get_timestamp_range_missing_column(batch_processor: BatchProcessor) -> 
     result = batch_processor.get_timestamp_range(records)
     # At least one record has timestamp, so should have a range
     assert result["max"] is not None
-

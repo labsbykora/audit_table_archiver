@@ -1,6 +1,5 @@
 """Unit tests for adaptive batch sizing."""
 
-
 from utils.adaptive_batch import AdaptiveBatchSizer
 
 
@@ -183,4 +182,3 @@ def test_adaptive_batch_sizer_average_calculation() -> None:
     # Batch size should remain stable or adjust slightly
     assert sizer.get_batch_size() >= sizer.min_batch_size
     assert sizer.get_batch_size() <= sizer.max_batch_size
-

@@ -1,7 +1,5 @@
 """Unit tests for logging module."""
 
-
-
 from utils.logging import configure_logging, get_logger
 
 
@@ -36,4 +34,3 @@ def test_get_logger_with_name() -> None:
     """Test getting named logger instance."""
     logger = get_logger("test_module")
     assert logger is not None
-

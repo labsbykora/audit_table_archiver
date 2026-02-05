@@ -37,4 +37,3 @@ def test_error_hierarchy() -> None:
     assert issubclass(DatabaseError, ArchiverError)
     assert issubclass(S3Error, ArchiverError)
     assert issubclass(VerificationError, ArchiverError)
-

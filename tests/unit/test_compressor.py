@@ -1,6 +1,5 @@
 """Unit tests for compressor module."""
 
-
 import pytest
 
 from archiver.compressor import Compressor
@@ -97,4 +96,3 @@ def test_decompress_invalid_data() -> None:
 
     with pytest.raises(ArchiverError, match="Decompression failed"):
         compressor.decompress(invalid_data)
-

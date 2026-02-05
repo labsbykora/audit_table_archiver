@@ -27,7 +27,9 @@ def transaction_manager(mock_connection: MagicMock) -> TransactionManager:
 
 
 @pytest.mark.asyncio
-async def test_transaction_success(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_transaction_success(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test successful transaction."""
     mock_transaction = MagicMock()
     mock_transaction.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -41,7 +43,9 @@ async def test_transaction_success(transaction_manager: TransactionManager, mock
 
 
 @pytest.mark.asyncio
-async def test_transaction_postgres_error(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_transaction_postgres_error(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test transaction with PostgreSQL error."""
     mock_transaction = MagicMock()
     error = asyncpg.PostgresError("Database error")
@@ -60,7 +64,9 @@ async def test_transaction_postgres_error(transaction_manager: TransactionManage
 
 
 @pytest.mark.asyncio
-async def test_transaction_timeout(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_transaction_timeout(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test transaction timeout."""
     mock_transaction = MagicMock()
 
@@ -78,7 +84,9 @@ async def test_transaction_timeout(transaction_manager: TransactionManager, mock
 
 
 @pytest.mark.asyncio
-async def test_savepoint_success(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_savepoint_success(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test successful savepoint creation and release."""
     async with transaction_manager.savepoint("test_sp"):
         pass
@@ -91,7 +99,9 @@ async def test_savepoint_success(transaction_manager: TransactionManager, mock_c
 
 
 @pytest.mark.asyncio
-async def test_savepoint_auto_name(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_savepoint_auto_name(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test savepoint with auto-generated name."""
     async with transaction_manager.savepoint():
         pass
@@ -102,12 +112,15 @@ async def test_savepoint_auto_name(transaction_manager: TransactionManager, mock
 
 
 @pytest.mark.asyncio
-async def test_savepoint_rollback(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_savepoint_rollback(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test savepoint rollback on error."""
     error = asyncpg.PostgresError("Savepoint error")
 
     # First call (SAVEPOINT) succeeds, second call (operation) fails
     call_count = 0
+
     async def execute_side_effect(*args, **kwargs):
         nonlocal call_count
         call_count += 1
@@ -129,12 +142,15 @@ async def test_savepoint_rollback(transaction_manager: TransactionManager, mock_
 
 
 @pytest.mark.asyncio
-async def test_savepoint_rollback_failure(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_savepoint_rollback_failure(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test savepoint rollback failure."""
     error = asyncpg.PostgresError("Savepoint error")
     rollback_error = asyncpg.PostgresError("Rollback failed")
 
     call_count = 0
+
     async def execute_side_effect(*args, **kwargs):
         nonlocal call_count
         call_count += 1
@@ -160,7 +176,9 @@ async def test_get_transaction_age_no_transaction(transaction_manager: Transacti
 
 
 @pytest.mark.asyncio
-async def test_get_transaction_age_active(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_get_transaction_age_active(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test get_transaction_age during active transaction."""
     mock_transaction = MagicMock()
     mock_transaction.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -174,7 +192,9 @@ async def test_get_transaction_age_active(transaction_manager: TransactionManage
 
 
 @pytest.mark.asyncio
-async def test_transaction_monitor_warning(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_transaction_monitor_warning(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test transaction monitor warning at 50% timeout."""
     # Use a very short timeout for testing
     manager = TransactionManager(mock_connection, timeout_seconds=1)
@@ -195,7 +215,9 @@ async def test_transaction_monitor_warning(transaction_manager: TransactionManag
 
 
 @pytest.mark.asyncio
-async def test_transaction_reset_on_exit(transaction_manager: TransactionManager, mock_connection: MagicMock) -> None:
+async def test_transaction_reset_on_exit(
+    transaction_manager: TransactionManager, mock_connection: MagicMock
+) -> None:
     """Test that transaction state is reset after exit."""
     mock_transaction = MagicMock()
     mock_transaction.__aenter__ = AsyncMock(return_value=mock_connection)
