@@ -27,26 +27,32 @@ def create_mock_pool_with_conn(mock_conn: AsyncMock) -> MagicMock:
     # 2. conn = await pool.acquire() (used in acquire_connection)
     
     # Create a mock that works as both async context manager and awaitable
-    class MockAcquire:
-        def __init__(self, conn):
-            self.conn = conn
-            self._entered = False
-        
-        async def __aenter__(self):
-            self._entered = True
-            return self.conn
-        
-        async def __aexit__(self, *args):
-            self._entered = False
-            return None
-        
-        def __await__(self):
-            # Make it awaitable to return connection directly
-            return iter([self.conn])
+    # Use a coroutine function to avoid event loop binding issues
+    async def acquire_coro():
+        return mock_conn
     
-    mock_acquire = MockAcquire(mock_conn)
-    mock_pool.acquire = MagicMock(return_value=mock_acquire)
-    mock_pool.release = AsyncMock()
+    # Create async context manager mock
+    mock_acquire_context = MagicMock()
+    mock_acquire_context.__aenter__ = AsyncMock(return_value=mock_conn, unsafe=True)
+    mock_acquire_context.__aexit__ = AsyncMock(return_value=None, unsafe=True)
+    
+    # pool.acquire() should return the context manager when called
+    # but also be awaitable to return connection directly
+    def acquire_mock():
+        # When used as context manager, return context manager
+        return mock_acquire_context
+    
+    # Make it awaitable (returns connection directly)
+    acquire_mock.__await__ = lambda self: acquire_coro().__await__()
+    
+    mock_pool.acquire = MagicMock(side_effect=acquire_mock)
+    # Also make it directly awaitable
+    mock_pool.acquire.return_value = mock_conn
+    # And support async context manager
+    mock_pool.acquire.__aenter__ = AsyncMock(return_value=mock_conn, unsafe=True)
+    mock_pool.acquire.__aexit__ = AsyncMock(return_value=None, unsafe=True)
+    
+    mock_pool.release = AsyncMock(unsafe=True)
     return mock_pool
 
 
