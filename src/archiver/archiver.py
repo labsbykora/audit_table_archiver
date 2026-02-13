@@ -1322,7 +1322,8 @@ class Archiver:
         batch_number: int,
         stats: dict[str, Any],
         table_schema: Optional[dict[str, Any]] = None,
-    ) -> Optional[str]:
+        upload_pipeline: Optional[UploadPipeline] = None,
+    ) -> tuple[Optional[str], Optional[UploadTask]]:
         """Process a single batch following verify-then-delete pattern.
 
         Pattern: FETCH → UPLOAD → VERIFY → DELETE → COMMIT
@@ -1549,7 +1550,7 @@ class Archiver:
                     )
 
         # Wait for upload to complete before verification (if async)
-        if upload_task:
+        if upload_task and upload_pipeline:
             try:
                 await upload_pipeline.wait_for_upload(upload_task)
                 if self.metrics:
