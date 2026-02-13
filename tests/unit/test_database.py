@@ -18,14 +18,35 @@ def create_mock_pool_with_conn(mock_conn: AsyncMock) -> MagicMock:
         mock_conn: Mock connection object
 
     Returns:
-        Mock pool with acquire() as async context manager
+        Mock pool with acquire() supporting both await and async context manager
     """
     mock_pool = MagicMock()
-    mock_acquire_context = MagicMock()
-    mock_acquire_context.__aenter__ = AsyncMock(return_value=mock_conn)
-    mock_acquire_context.__aexit__ = AsyncMock(return_value=None)
-    mock_pool.acquire = MagicMock(return_value=mock_acquire_context)
-    mock_pool.release = MagicMock()
+    
+    # pool.acquire() needs to support both patterns:
+    # 1. async with pool.acquire() as conn: (used in _ensure_pool_healthy)
+    # 2. conn = await pool.acquire() (used in acquire_connection)
+    
+    # Create a mock that works as both async context manager and awaitable
+    class MockAcquire:
+        def __init__(self, conn):
+            self.conn = conn
+            self._entered = False
+        
+        async def __aenter__(self):
+            self._entered = True
+            return self.conn
+        
+        async def __aexit__(self, *args):
+            self._entered = False
+            return None
+        
+        def __await__(self):
+            # Make it awaitable to return connection directly
+            return iter([self.conn])
+    
+    mock_acquire = MockAcquire(mock_conn)
+    mock_pool.acquire = MagicMock(return_value=mock_acquire)
+    mock_pool.release = AsyncMock()
     return mock_pool
 
 
