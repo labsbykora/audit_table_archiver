@@ -31,27 +31,13 @@ def create_mock_pool_with_conn(mock_conn: AsyncMock) -> MagicMock:
     async def acquire_coro():
         return mock_conn
     
-    # Create async context manager mock
+    # pool.acquire() is an async context manager (used in both _ensure_pool_healthy and acquire_connection)
     mock_acquire_context = MagicMock()
     mock_acquire_context.__aenter__ = AsyncMock(return_value=mock_conn, unsafe=True)
     mock_acquire_context.__aexit__ = AsyncMock(return_value=None, unsafe=True)
     
-    # pool.acquire() should return the context manager when called
-    # but also be awaitable to return connection directly
-    def acquire_mock():
-        # When used as context manager, return context manager
-        return mock_acquire_context
-    
-    # Make it awaitable (returns connection directly)
-    acquire_mock.__await__ = lambda self: acquire_coro().__await__()
-    
-    mock_pool.acquire = MagicMock(side_effect=acquire_mock)
-    # Also make it directly awaitable
-    mock_pool.acquire.return_value = mock_conn
-    # And support async context manager
-    mock_pool.acquire.__aenter__ = AsyncMock(return_value=mock_conn, unsafe=True)
-    mock_pool.acquire.__aexit__ = AsyncMock(return_value=None, unsafe=True)
-    
+    # pool.acquire() returns the context manager
+    mock_pool.acquire = MagicMock(return_value=mock_acquire_context)
     mock_pool.release = AsyncMock(unsafe=True)
     return mock_pool
 
