@@ -22,6 +22,11 @@ defaults:
   sleep_between_batches: 2           # Seconds to sleep between handling archive batches
   vacuum_after: true                 # Whether to run VACUUM after archive/delete
   vacuum_strategy: standard          # VACUUM type: standard (default), none, analyze, full (Postgres only)
+  # Batch error recovery options
+  batch_retry_attempts: 3            # Retry failed batches up to 3 times
+  batch_retry_delay: 2.0            # Initial retry delay (seconds)
+  skip_failed_batches: false        # Fail fast on batch errors (recommended)
+  max_failed_batches: 10             # Stop after 10 failed batches
 
 # Databases to connect for archiving
 
