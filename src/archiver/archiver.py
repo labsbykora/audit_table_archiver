@@ -27,6 +27,7 @@ from archiver.metrics import ArchiverMetrics
 from archiver.multipart_cleanup import MultipartCleanup
 from archiver.notification_manager import EnhancedNotificationManager
 from archiver.progress_tracker import ProgressTracker
+from archiver.query_analyzer import QueryAnalyzer
 from archiver.retention_policy import RetentionPolicyEnforcer
 from archiver.s3_client import S3Client
 from archiver.sample_verifier import SampleVerifier
@@ -605,7 +606,26 @@ class Archiver:
             s3_client=s3_client,
         )
 
-        batch_processor = BatchProcessor(db_manager, db_config, table_config, logger=self.logger)
+        # Initialize query analyzer if enabled
+        query_analyzer = None
+        if getattr(self.config.defaults, "query_plan_analysis", True):
+            query_analyzer = QueryAnalyzer(
+                logger=self.logger,
+                slow_query_threshold=getattr(
+                    self.config.defaults, "slow_query_threshold", 2.0
+                ),
+                warn_on_seq_scan=getattr(
+                    self.config.defaults, "warn_on_seq_scan", True
+                ),
+            )
+
+        batch_processor = BatchProcessor(
+            db_manager,
+            db_config,
+            table_config,
+            logger=self.logger,
+            query_analyzer=query_analyzer,
+        )
 
         # Detect table schema (for first batch or schema tracking)
         table_schema = None

@@ -485,6 +485,19 @@ class DefaultsConfig(BaseModel):
         description="Maximum number of failed batches before stopping table archival",
         ge=1,
     )
+    query_plan_analysis: bool = Field(
+        default=True,
+        description="Enable query plan analysis for performance monitoring",
+    )
+    slow_query_threshold: float = Field(
+        default=2.0,
+        description="Log queries slower than this threshold (seconds)",
+        ge=0,
+    )
+    warn_on_seq_scan: bool = Field(
+        default=True,
+        description="Warn when sequential scans are detected (indicates missing index)",
+    )
 
 
 class LegalHoldConfig(BaseModel):

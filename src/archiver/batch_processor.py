@@ -1,5 +1,6 @@
 """Batch processing logic for selecting and processing records."""
 
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -9,6 +10,7 @@ import structlog
 from archiver.config import DatabaseConfig, TableConfig
 from archiver.database import DatabaseManager
 from archiver.exceptions import DatabaseError
+from archiver.query_analyzer import QueryAnalyzer
 from utils import safe_identifier
 from utils.logging import get_logger
 
@@ -22,6 +24,7 @@ class BatchProcessor:
         db_config: DatabaseConfig,
         table_config: TableConfig,
         logger: Optional[structlog.BoundLogger] = None,
+        query_analyzer: Optional[QueryAnalyzer] = None,
     ) -> None:
         """Initialize batch processor.
 
@@ -30,11 +33,13 @@ class BatchProcessor:
             db_config: Database configuration
             table_config: Table configuration
             logger: Optional logger instance
+            query_analyzer: Optional query analyzer for performance monitoring
         """
         self.db_manager = db_manager
         self.db_config = db_config
         self.table_config = table_config
         self.logger = logger or get_logger("batch_processor")
+        self.query_analyzer = query_analyzer
 
     async def _is_timestamp_column_timezone_aware(self) -> bool:
         """Check if the timestamp column is timezone-aware (TIMESTAMPTZ).
@@ -199,14 +204,51 @@ class BatchProcessor:
             params = (cutoff, batch_size)
 
         try:
+            # Measure query execution time
+            start_time = time.time()
             records = await self.db_manager.fetch(query, *params)
+            query_time = time.time() - start_time
+
             self.logger.debug(
                 "Batch selected",
                 database=self.db_config.name,
                 table=table,
                 count=len(records),
                 batch_size=batch_size,
+                query_time=query_time,
             )
+
+            # Analyze query plan if analyzer is available
+            if self.query_analyzer:
+                try:
+                    analysis = await self.query_analyzer.analyze_query_plan(
+                        db_manager=self.db_manager,
+                        query=query,
+                        params=params,
+                        query_time=query_time,
+                        database=self.db_config.name,
+                        table=table,
+                    )
+
+                    # Log suggestions if any
+                    if analysis.get("suggestions"):
+                        for suggestion in analysis["suggestions"]:
+                            self.logger.info(
+                                "Query optimization suggestion",
+                                database=self.db_config.name,
+                                table=table,
+                                suggestion=suggestion,
+                            )
+
+                except Exception as e:
+                    # Don't fail batch selection on analysis errors
+                    self.logger.debug(
+                        "Query plan analysis failed (non-critical)",
+                        database=self.db_config.name,
+                        table=table,
+                        error=str(e),
+                    )
+
             return records
 
         except Exception as e:
