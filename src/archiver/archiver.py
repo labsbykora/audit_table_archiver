@@ -32,6 +32,7 @@ from archiver.retention_policy import RetentionPolicyEnforcer
 from archiver.s3_client import S3Client
 from archiver.sample_verifier import SampleVerifier
 from archiver.schema_detector import SchemaDetector
+from archiver.upload_pipeline import UploadPipeline, UploadTask
 from archiver.schema_drift import SchemaDriftDetector
 from archiver.serializer import PostgreSQLSerializer
 from archiver.verifier import Verifier
@@ -830,8 +831,47 @@ class Archiver:
         is_first_batch = True  # Track first batch for schema inclusion
         s3_key = None  # Track S3 key for notifications
 
+        # Initialize upload pipeline if enabled
+        upload_pipeline: Optional[UploadPipeline] = None
+        pending_upload_task: Optional[UploadTask] = None
+        if getattr(self.config.defaults, "async_upload_pipeline", False):
+            max_concurrent = getattr(self.config.defaults, "max_concurrent_uploads", 2)
+            upload_pipeline = UploadPipeline(
+                s3_client=s3_client,
+                max_concurrent_uploads=max_concurrent,
+                logger=self.logger,
+            )
+            self.logger.info(
+                "Async upload pipeline enabled",
+                database=db_config.name,
+                table=table_config.name,
+                max_concurrent_uploads=max_concurrent,
+            )
+
         while True:
             batch_number += 1
+
+            # Wait for previous batch upload to complete before processing next batch
+            # This maintains verify-then-delete pattern while allowing upload overlap
+            if pending_upload_task and upload_pipeline:
+                try:
+                    await upload_pipeline.wait_for_upload(pending_upload_task)
+                    self.logger.debug(
+                        "Previous batch upload completed",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number - 1,
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        "Previous batch upload failed",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number - 1,
+                        error=str(e),
+                    )
+                    raise
+                pending_upload_task = None
             self.logger.debug(
                 "Processing batch",
                 database=db_config.name,
@@ -928,10 +968,36 @@ class Archiver:
                                 error=str(e),
                             )
 
+                    # Wait for any pending uploads before finishing
+                    if pending_upload_task and upload_pipeline:
+                        try:
+                            await upload_pipeline.wait_for_upload(pending_upload_task)
+                        except Exception as e:
+                            self.logger.error(
+                                "Final batch upload failed",
+                                database=db_config.name,
+                                table=table_config.name,
+                                error=str(e),
+                            )
+                            raise
+
+                    # Wait for all remaining uploads
+                    if upload_pipeline:
+                        try:
+                            await upload_pipeline.wait_for_all()
+                        except Exception as e:
+                            self.logger.error(
+                                "Failed to complete all uploads",
+                                database=db_config.name,
+                                table=table_config.name,
+                                error=str(e),
+                            )
+                            raise
+
                     break
 
                 # Process batch
-                s3_key = await self._process_batch(
+                s3_key, batch_upload_task = await self._process_batch(
                     db_manager,
                     s3_client,
                     batch_processor,
@@ -943,7 +1009,12 @@ class Archiver:
                     table_schema=(
                         table_schema if is_first_batch else None
                     ),  # Pass schema for first batch
+                    upload_pipeline=upload_pipeline,
                 )
+
+                # Track upload task for next iteration
+                if batch_upload_task:
+                    pending_upload_task = batch_upload_task
 
                 # Update cursor for next batch
                 record_dicts = batch_processor.records_to_dicts(records)
@@ -1255,6 +1326,7 @@ class Archiver:
         """Process a single batch following verify-then-delete pattern.
 
         Pattern: FETCH → UPLOAD → VERIFY → DELETE → COMMIT
+        With async pipeline: FETCH → START_UPLOAD (async) → VERIFY (wait) → DELETE → COMMIT
 
         Args:
             db_manager: Database manager
@@ -1265,6 +1337,11 @@ class Archiver:
             records: Records to process
             batch_number: Batch number
             stats: Statistics dictionary
+            table_schema: Optional table schema
+            upload_pipeline: Optional upload pipeline for async uploads
+
+        Returns:
+            Tuple of (s3_key, upload_task) where upload_task is None if sync upload
         """
         # Generate batch ID
         batch_id = self._generate_batch_id(db_config.name, table_config.name, batch_number)
@@ -1393,34 +1470,49 @@ class Archiver:
                 tmp_path = Path(tmp_file.name)
                 tmp_path.write_bytes(compressed_data)
 
-            # Close the file handle before uploading (fixes Windows file locking issue)
-            try:
+            # Upload file (async if pipeline enabled, sync otherwise)
+            upload_task: Optional[UploadTask] = None
+            if upload_pipeline:
+                # Start async upload
                 if self.metrics:
                     self.metrics.start_phase_timer("upload")
-                _ = s3_client.upload_file(tmp_path, s3_key)
-                if self.metrics:
-                    self.metrics.stop_phase_timer(
-                        database=db_config.name,
-                        table=table_config.name,
-                        schema=table_config.schema_name,
-                        phase="upload",
-                    )
+                upload_task = await upload_pipeline.start_upload(tmp_path, s3_key)
                 self.logger.debug(
-                    "File uploaded to S3",
+                    "File upload started (async)",
                     bucket=self.config.s3.bucket,
                     key=s3_key,
                     size=compressed_size,
                 )
-            finally:
-                # Delete temp file after upload completes
+                # Don't delete temp file yet - will be deleted after upload completes
+            else:
+                # Synchronous upload (original behavior)
                 try:
-                    tmp_path.unlink()
-                except Exception as e:
-                    self.logger.warning(
-                        "Failed to delete temporary file",
-                        path=str(tmp_path),
-                        error=str(e),
+                    if self.metrics:
+                        self.metrics.start_phase_timer("upload")
+                    _ = s3_client.upload_file(tmp_path, s3_key)
+                    if self.metrics:
+                        self.metrics.stop_phase_timer(
+                            database=db_config.name,
+                            table=table_config.name,
+                            schema=table_config.schema_name,
+                            phase="upload",
+                        )
+                    self.logger.debug(
+                        "File uploaded to S3",
+                        bucket=self.config.s3.bucket,
+                        key=s3_key,
+                        size=compressed_size,
                     )
+                finally:
+                    # Delete temp file after upload completes
+                    try:
+                        tmp_path.unlink()
+                    except Exception as e:
+                        self.logger.warning(
+                            "Failed to delete temporary file",
+                            path=str(tmp_path),
+                            error=str(e),
+                        )
 
             # Upload metadata file
             metadata_filename = filename.replace(".jsonl.gz", ".metadata.json")
@@ -1455,6 +1547,34 @@ class Archiver:
                         path=str(tmp_meta_path),
                         error=str(e),
                     )
+
+        # Wait for upload to complete before verification (if async)
+        if upload_task:
+            try:
+                await upload_pipeline.wait_for_upload(upload_task)
+                if self.metrics:
+                    self.metrics.stop_phase_timer(
+                        database=db_config.name,
+                        table=table_config.name,
+                        schema=table_config.schema_name,
+                        phase="upload",
+                    )
+                # Delete temp file after upload completes
+                try:
+                    tmp_path.unlink()
+                except Exception as e:
+                    self.logger.warning(
+                        "Failed to delete temporary file",
+                        path=str(tmp_path),
+                        error=str(e),
+                    )
+            except Exception as e:
+                # Clean up temp file on error
+                try:
+                    tmp_path.unlink()
+                except Exception:
+                    pass
+                raise
 
         # Verify counts
         if self.metrics:
@@ -1672,7 +1792,7 @@ class Archiver:
         )
 
         # Return S3 key for tracking at table level
-        return s3_key
+        return s3_key, upload_task
 
     def _generate_batch_id(self, database: str, table: str, batch_number: int) -> str:
         """Generate deterministic batch ID.

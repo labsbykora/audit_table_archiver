@@ -91,11 +91,11 @@ class QueryAnalyzer:
             if not plan_json or not isinstance(plan_json, list) or not plan_json:
                 return analysis
 
-            plan_json = plan_json[0] if isinstance(plan_json[0], dict) else plan_json
-            if not plan_json or not plan_json[0].get("Plan"):
+            # Extract plan from first element
+            plan_entry = plan_json[0] if isinstance(plan_json[0], dict) else plan_json
+            plan = plan_entry.get("Plan") if isinstance(plan_entry, dict) else None
+            if not plan:
                 return analysis
-
-            plan = plan_json[0]["Plan"]
 
             # Analyze plan nodes recursively
             self._analyze_plan_node(plan, analysis)

@@ -498,6 +498,16 @@ class DefaultsConfig(BaseModel):
         default=True,
         description="Warn when sequential scans are detected (indicates missing index)",
     )
+    async_upload_pipeline: bool = Field(
+        default=False,
+        description="Enable async upload pipeline for overlapping uploads (experimental)",
+    )
+    max_concurrent_uploads: int = Field(
+        default=2,
+        description="Maximum concurrent uploads when async pipeline is enabled",
+        ge=1,
+        le=5,
+    )
 
 
 class LegalHoldConfig(BaseModel):
