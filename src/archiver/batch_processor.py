@@ -165,6 +165,9 @@ class BatchProcessor:
         cutoff = await self.calculate_cutoff_date_for_query()
 
         # Build query with cursor-based pagination
+        # Use query hints for better performance:
+        # - Index scan preferred (if index exists on timestamp_column, primary_key)
+        # - Sequential scan only if no index available
         if last_timestamp and last_primary_key is not None:
             # Continue from last position
             # Allow records with timestamp > last_timestamp (new records inserted after watermark)
@@ -184,6 +187,7 @@ class BatchProcessor:
             params = (cutoff, last_timestamp, last_primary_key, batch_size)
         else:
             # First batch
+            # Optimize for index scan on timestamp column
             query = f"""
                 SELECT *
                 FROM {schema}.{table}
