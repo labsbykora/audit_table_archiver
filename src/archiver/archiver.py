@@ -174,6 +174,8 @@ class Archiver:
             "records_archived_this_run": 0,  # This run only
             "records_archived_total": 0,  # Overall (including checkpoint)
             "batches_processed": 0,
+            "total_failed_batches": 0,
+            "failed_batches": {},  # Track failed batches per table
             "start_time": datetime.now(timezone.utc).isoformat(),
             "database_stats": [],  # Per-database statistics
         }
@@ -197,9 +199,19 @@ class Archiver:
 
         stats["end_time"] = datetime.now(timezone.utc).isoformat()
 
+        # Count failed batches across all tables
+        total_failed_batches = 0
+        if "failed_batches" in stats:
+            for table_failures in stats["failed_batches"].values():
+                total_failed_batches += len(table_failures)
+        stats["total_failed_batches"] = total_failed_batches
+
         # Determine final status
         if stats["databases_failed"] == 0 and stats["tables_failed"] == 0:
-            final_status = "success"
+            if total_failed_batches > 0:
+                final_status = "partial"  # Some batches failed but tables completed
+            else:
+                final_status = "success"
         elif stats["databases_processed"] > 0 or stats["tables_processed"] > 0:
             final_status = "partial"
         else:
@@ -1032,15 +1044,181 @@ class Archiver:
                             )
 
             except Exception as e:
-                self.logger.error(
-                    "Batch processing failed",
-                    database=db_config.name,
-                    table=table_config.name,
-                    batch=batch_number,
-                    error=str(e),
-                    exc_info=True,
+                # Batch-level error recovery
+                batch_retry_attempts = getattr(
+                    self.config.defaults, "batch_retry_attempts", 3
                 )
-                raise
+                skip_failed_batches = getattr(
+                    self.config.defaults, "skip_failed_batches", False
+                )
+                max_failed_batches = getattr(
+                    self.config.defaults, "max_failed_batches", 10
+                )
+
+                # Track failed batches
+                failed_batches_key = f"{db_config.name}.{table_config.name}"
+                if "failed_batches" not in stats:
+                    stats["failed_batches"] = {}
+                if failed_batches_key not in stats["failed_batches"]:
+                    stats["failed_batches"][failed_batches_key] = []
+
+                failed_batch_info = {
+                    "batch_number": batch_number,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                stats["failed_batches"][failed_batches_key].append(failed_batch_info)
+
+                # Check if we've exceeded max failed batches
+                total_failed = len(stats["failed_batches"][failed_batches_key])
+                if total_failed >= max_failed_batches:
+                    self.logger.error(
+                        "Maximum failed batches exceeded, stopping table archival",
+                        database=db_config.name,
+                        table=table_config.name,
+                        failed_batches=total_failed,
+                        max_failed_batches=max_failed_batches,
+                    )
+                    raise
+
+                # Retry logic
+                if batch_retry_attempts > 0:
+                    retry_success = False
+                    for retry_attempt in range(batch_retry_attempts):
+                        try:
+                            self.logger.warning(
+                                "Retrying failed batch",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                                retry_attempt=retry_attempt + 1,
+                                max_retries=batch_retry_attempts,
+                                error=str(e),
+                            )
+
+                            # Re-select the same batch
+                            retry_records = await batch_processor.select_batch(
+                                batch_size=table_config.batch_size
+                                or self.config.defaults.batch_size,
+                                last_timestamp=last_timestamp,
+                                last_primary_key=last_primary_key,
+                            )
+
+                            if not retry_records:
+                                # No more records, break out of retry loop
+                                break
+
+                            # Process retry batch
+                            await self._process_batch(
+                                db_manager,
+                                s3_client,
+                                batch_processor,
+                                db_config,
+                                table_config,
+                                retry_records,
+                                batch_number,
+                                stats,
+                                table_schema=(
+                                    table_schema if is_first_batch else None
+                                ),
+                            )
+
+                            # Success - update cursor and continue
+                            retry_record_dicts = batch_processor.records_to_dicts(
+                                retry_records
+                            )
+                            last_timestamp, last_primary_key = (
+                                batch_processor.get_last_cursor(retry_record_dicts)
+                            )
+
+                            stats["batches_processed"] += 1
+                            stats["records_archived"] += len(retry_records)
+                            records_archived_so_far += len(retry_records)
+                            records_archived_this_run += len(retry_records)
+                            batches_processed_so_far += 1
+
+                            # Remove from failed batches (retry succeeded)
+                            stats["failed_batches"][failed_batches_key].pop()
+
+                            self.logger.info(
+                                "Batch retry succeeded",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                                retry_attempt=retry_attempt + 1,
+                            )
+
+                            retry_success = True
+                            is_first_batch = False
+                            break
+
+                        except Exception as retry_error:
+                            retry_delay = (
+                                self.config.defaults.batch_retry_delay
+                                * (2 ** retry_attempt)
+                            )  # Exponential backoff
+                            self.logger.warning(
+                                "Batch retry failed, will retry again",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                                retry_attempt=retry_attempt + 1,
+                                retry_delay=retry_delay,
+                                error=str(retry_error),
+                            )
+                            if retry_attempt < batch_retry_attempts - 1:
+                                await asyncio.sleep(retry_delay)
+
+                    if retry_success:
+                        # Continue to next batch
+                        continue
+
+                # All retries exhausted or retry disabled
+                if skip_failed_batches:
+                    self.logger.error(
+                        "Batch processing failed, skipping batch and continuing",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number,
+                        error=str(e),
+                        failed_batches=total_failed,
+                        max_failed_batches=max_failed_batches,
+                    )
+                    # Skip this batch and continue to next
+                    # Note: We don't update cursor, so we'll try the same batch again
+                    # This could cause infinite loop if batch keeps failing
+                    # Better approach: advance cursor to skip failed batch
+                    try:
+                        # Try to get cursor from failed batch to skip it
+                        record_dicts = batch_processor.records_to_dicts(records)
+                        if record_dicts:
+                            last_timestamp, last_primary_key = (
+                                batch_processor.get_last_cursor(record_dicts)
+                            )
+                            self.logger.info(
+                                "Skipping failed batch, advancing cursor",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                            )
+                    except Exception:
+                        # If we can't get cursor, we'll retry same batch next iteration
+                        # This is a limitation of skip-on-failure
+                        pass
+                    continue
+                else:
+                    # Fail fast - raise exception
+                    self.logger.error(
+                        "Batch processing failed, stopping table archival",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number,
+                        error=str(e),
+                        failed_batches=total_failed,
+                        exc_info=True,
+                    )
+                    raise
 
     async def _process_batch(
         self,

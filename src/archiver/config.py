@@ -465,6 +465,26 @@ class DefaultsConfig(BaseModel):
         default="s3",
         description="Storage backend for audit trail (s3, database)",
     )
+    batch_retry_attempts: int = Field(
+        default=3,
+        description="Number of retry attempts for failed batches",
+        ge=0,
+        le=10,
+    )
+    batch_retry_delay: float = Field(
+        default=2.0,
+        description="Initial delay between batch retry attempts (seconds)",
+        ge=0,
+    )
+    skip_failed_batches: bool = Field(
+        default=False,
+        description="Skip failed batches and continue processing (use with caution)",
+    )
+    max_failed_batches: int = Field(
+        default=10,
+        description="Maximum number of failed batches before stopping table archival",
+        ge=1,
+    )
 
 
 class LegalHoldConfig(BaseModel):
