@@ -192,13 +192,9 @@ class DatabaseManager:
                 context={"database": self.config.name},
             )
 
-        conn = await self.pool.acquire()
-        try:
+        # pool.acquire() is an async context manager, use it properly
+        async with self.pool.acquire() as conn:
             yield conn
-        finally:
-            # Check if pool still exists (might have been disconnected)
-            if self.pool:
-                await self.pool.release(conn)
 
     @asynccontextmanager
     async def transaction(self) -> AsyncGenerator[asyncpg.Connection, None]:
