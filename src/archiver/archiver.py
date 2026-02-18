@@ -33,6 +33,7 @@ from archiver.s3_client import S3Client
 from archiver.sample_verifier import SampleVerifier
 from archiver.schema_detector import SchemaDetector
 from archiver.upload_pipeline import UploadPipeline, UploadTask
+from archiver.vacuum_manager import VacuumManager
 from archiver.schema_drift import SchemaDriftDetector
 from archiver.serializer import PostgreSQLSerializer
 from archiver.verifier import Verifier
@@ -76,6 +77,7 @@ class Archiver:
             fail_on_drift=defaults.fail_on_schema_drift,
             logger=self.logger,
         )
+        self.vacuum_manager = VacuumManager(logger=self.logger)
         self.watermark_manager = WatermarkManager(
             storage_type=defaults.watermark_storage_type,
             logger=self.logger,
@@ -993,6 +995,72 @@ class Archiver:
                                 error=str(e),
                             )
                             raise
+
+                    # Run vacuum to reclaim space (if enabled)
+                    # Check table-level config first, then fall back to defaults
+                    vacuum_after_archive = (
+                        table_config.vacuum_after_archive
+                        if table_config.vacuum_after_archive is not None
+                        else self.config.defaults.vacuum_after_archive
+                    )
+                    vacuum_type = (
+                        table_config.vacuum_type
+                        if table_config.vacuum_type is not None
+                        else self.config.defaults.vacuum_type
+                    )
+
+                    if vacuum_after_archive:
+                        try:
+                            vacuum_result = await self.vacuum_manager.vacuum_table_after_archive(
+                                db_manager=db_manager,
+                                schema_name=table_config.schema_name,
+                                table_name=table_config.name,
+                                vacuum_type=vacuum_type,
+                                dry_run=self.dry_run,
+                            )
+
+                            # Log vacuum results
+                            if vacuum_result.get("success"):
+                                space_reclaimed = vacuum_result.get("space_reclaimed")
+                                if space_reclaimed:
+                                    total_mb = space_reclaimed["total_size_bytes"] / (1024 * 1024)
+                                    self.logger.info(
+                                        "Space reclaimed after archival",
+                                        database=db_config.name,
+                                        table=table_config.name,
+                                        schema=table_config.schema_name,
+                                        total_size_reclaimed_mb=total_mb,
+                                        vacuum_type=vacuum_result.get("vacuum_type"),
+                                        duration_seconds=vacuum_result.get("duration_seconds", 0),
+                                    )
+                                else:
+                                    self.logger.info(
+                                        "Vacuum completed (no size tracking available)",
+                                        database=db_config.name,
+                                        table=table_config.name,
+                                        schema=table_config.schema_name,
+                                        vacuum_type=vacuum_result.get("vacuum_type"),
+                                        duration_seconds=vacuum_result.get("duration_seconds", 0),
+                                    )
+                            else:
+                                # Vacuum failed but don't fail the archival
+                                self.logger.warning(
+                                    "Vacuum failed (non-critical - archival succeeded)",
+                                    database=db_config.name,
+                                    table=table_config.name,
+                                    schema=table_config.schema_name,
+                                    error=vacuum_result.get("error"),
+                                )
+                        except Exception as e:
+                            # Log but don't fail - vacuum is non-critical
+                            self.logger.warning(
+                                "Vacuum operation failed (non-critical - archival succeeded)",
+                                database=db_config.name,
+                                table=table_config.name,
+                                schema=table_config.schema_name,
+                                error=str(e),
+                                exc_info=True,
+                            )
 
                     break
 

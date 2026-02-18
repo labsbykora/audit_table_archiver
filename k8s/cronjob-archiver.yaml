@@ -161,4 +161,3 @@ spec:
             - name: config
               configMap:
                 name: archiver-config
-

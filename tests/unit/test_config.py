@@ -36,6 +36,40 @@ def test_table_config_validation() -> None:
     assert config.name == "test_table"
     assert config.schema_name == "public"  # default
     assert config.retention_days is None
+    assert config.vacuum_after_archive is None
+    assert config.vacuum_type is None
+
+
+def test_table_config_vacuum_settings() -> None:
+    """Test table-level vacuum configuration."""
+    # Table with vacuum settings
+    config = TableConfig(
+        name="test_table",
+        timestamp_column="created_at",
+        primary_key="id",
+        vacuum_after_archive=True,
+        vacuum_type="full",
+    )
+    assert config.vacuum_after_archive is True
+    assert config.vacuum_type == "full"
+
+    # Table without vacuum settings (uses defaults)
+    config2 = TableConfig(
+        name="test_table2",
+        timestamp_column="created_at",
+        primary_key="id",
+    )
+    assert config2.vacuum_after_archive is None
+    assert config2.vacuum_type is None
+
+    # Test invalid vacuum_type
+    with pytest.raises(ValueError, match="vacuum_type must be one of"):
+        TableConfig(
+            name="test_table3",
+            timestamp_column="created_at",
+            primary_key="id",
+            vacuum_type="invalid",
+        )
 
 
 def test_database_config_validation() -> None:

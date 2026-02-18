@@ -45,6 +45,9 @@ databases:
         primary_key: id              # Primary key column (must uniquely identify rows)
         retention_days: 90           # Retention period for this table (can override global default)
         batch_size: 10000            # Batch size for this table (can override global default)
+        # Table-level vacuum settings (optional - overrides defaults)
+        # vacuum_after_archive: true  # Enable vacuum for this table
+        # vacuum_type: analyze  # Options: none, analyze, standard, full
 
 # --- Performance tuning settings ---
 
