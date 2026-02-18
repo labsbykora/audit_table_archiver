@@ -125,6 +125,205 @@ Circuit breaker prevents cascading failures:
 
 ## Query Performance
 
+> **💡 Tip**: For a comprehensive guide on optimizing queries **without adding indexes** (to save storage), see [Query Optimization Without Indexes](query-optimization-no-indexes.md).
+
+### Query Optimization Without Indexes
+
+**When storage is a concern**, you can optimize queries without adding indexes:
+
+#### 1. Reduce Batch Size
+
+Smaller batches = faster queries even without indexes:
+
+```yaml
+defaults:
+  batch_size: 5000  # Reduce from 10000 to 5000
+```
+
+**Impact**: 
+- **Query time**: 30-50% faster (less data to scan)
+- **Memory**: Lower memory usage
+- **Trade-off**: More batches = more overhead, but faster per-batch
+
+**Recommended**: Start with 5,000 and increase if queries are fast enough.
+
+#### 2. Optimize Database Configuration
+
+PostgreSQL settings that help sequential scans:
+
+```sql
+-- Increase work_mem for sorting (per-query memory)
+SET work_mem = '256MB';  -- Default is 4MB
+
+-- Increase shared_buffers (cached data)
+-- Edit postgresql.conf:
+shared_buffers = '2GB'  -- 25% of RAM for dedicated DB server
+
+-- Enable parallel query execution
+max_parallel_workers_per_gather = 4
+parallel_tuple_cost = 0.1  -- Lower cost for parallel scans
+```
+
+**Impact**: 
+- **work_mem**: 20-40% faster sorting/aggregation
+- **shared_buffers**: 10-30% faster (more data cached)
+- **Parallel scans**: 2-4x faster on multi-core systems
+
+**Note**: These are server-level settings. Adjust in `postgresql.conf` and restart.
+
+#### 3. Keep Statistics Fresh
+
+PostgreSQL uses statistics to optimize queries. Keep them updated:
+
+```sql
+-- Run ANALYZE regularly (updates statistics)
+ANALYZE public.auditlog_log_line;
+
+-- Or use VACUUM ANALYZE (also reclaims space)
+VACUUM ANALYZE public.auditlog_log_line;
+```
+
+**Impact**: 
+- **Query planner**: Better query plans (10-30% faster)
+- **Autovacuum**: Enable autovacuum to run automatically
+
+**Configuration** (postgresql.conf):
+```ini
+autovacuum = on
+autovacuum_analyze_scale_factor = 0.05  # Analyze after 5% changes
+autovacuum_analyze_threshold = 50  # Minimum rows changed
+```
+
+#### 4. Reduce Table Bloat
+
+Bloated tables slow down sequential scans:
+
+```sql
+-- Check table bloat
+SELECT 
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS total_size,
+    pg_size_pretty(pg_relation_size(schemaname||'.'||tablename)) AS table_size,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - 
+                   pg_relation_size(schemaname||'.'||tablename)) AS bloat_size
+FROM pg_tables
+WHERE tablename = 'auditlog_log_line';
+
+-- Reclaim space (run during maintenance window)
+VACUUM FULL public.auditlog_log_line;
+```
+
+**Impact**: 
+- **Bloat reduction**: 20-50% faster scans on bloated tables
+- **Space**: Reclaims dead space
+
+**Warning**: `VACUUM FULL` locks the table. Use during maintenance windows.
+
+#### 5. Use More Selective WHERE Clauses
+
+Narrow the date range if possible:
+
+```yaml
+# Instead of archiving all records older than 90 days,
+# archive in smaller chunks (e.g., 30 days at a time)
+defaults:
+  retention_days: 30  # Smaller window = faster queries
+```
+
+**Impact**: 
+- **Query time**: 30-60% faster (less data to scan)
+- **Trade-off**: More frequent archival runs
+
+#### 6. Enable Parallel Sequential Scans
+
+PostgreSQL can parallelize sequential scans:
+
+```sql
+-- Check if parallel scans are enabled
+SHOW max_parallel_workers_per_gather;  -- Should be > 0
+
+-- Enable in postgresql.conf:
+max_parallel_workers_per_gather = 4
+min_parallel_table_scan_size = 8MB  -- Tables > 8MB can use parallel scans
+```
+
+**Impact**: 
+- **Multi-core systems**: 2-4x faster on large tables
+- **Single-core**: No benefit
+
+**Requirements**:
+- Table must be large enough (> 8MB by default)
+- Query must not have `FOR UPDATE` (but `FOR UPDATE SKIP LOCKED` works)
+- Multiple CPU cores available
+
+#### 7. Optimize Connection Settings
+
+Reduce query overhead:
+
+```yaml
+databases:
+  - name: production_db
+    connection_pool_size: 3  # Fewer connections = less overhead
+    # Use statement_timeout to prevent runaway queries
+```
+
+**PostgreSQL connection settings**:
+```sql
+-- Set per-connection timeouts
+SET statement_timeout = '30s';  -- Kill queries > 30s
+SET idle_in_transaction_session_timeout = '5min';  -- Kill idle transactions
+```
+
+#### 8. Use Cursor-Based Pagination (Already Implemented)
+
+The archiver already uses cursor-based pagination, which is optimal:
+
+```sql
+-- Instead of OFFSET (slow):
+SELECT * FROM table OFFSET 10000 LIMIT 10000;  -- ❌ Slow
+
+-- Uses cursor (fast):
+SELECT * FROM table WHERE id > last_id ORDER BY id LIMIT 10000;  -- ✅ Fast
+```
+
+**Impact**: 
+- **Already optimized**: No changes needed
+- **Performance**: Constant time regardless of position
+
+#### 9. Reduce Lock Contention
+
+Optimize locking strategy:
+
+```sql
+-- Current query uses:
+FOR UPDATE SKIP LOCKED  -- ✅ Good: Skips locked rows
+
+-- Alternative (if you can tolerate some contention):
+-- Remove FOR UPDATE entirely (faster, but less safe)
+```
+
+**Impact**: 
+- **SKIP LOCKED**: Minimal impact (already optimal)
+- **No FOR UPDATE**: 10-20% faster, but risk of concurrent modifications
+
+**Recommendation**: Keep `FOR UPDATE SKIP LOCKED` for safety.
+
+#### 10. Process During Off-Peak Hours
+
+Run archival when database load is low:
+
+```yaml
+# Schedule via cron or systemd timer
+# Example: Run at 2 AM daily
+0 2 * * * /usr/bin/archiver --config /etc/archiver/config.yaml
+```
+
+**Impact**: 
+- **Database resources**: More CPU/memory available
+- **Query performance**: 10-30% faster during low load
+- **No user impact**: Doesn't affect production traffic
+
 ### Query Optimization Tips
 
 1. **Use EXPLAIN ANALYZE** to understand query plans:
@@ -139,7 +338,7 @@ Circuit breaker prevents cascading failures:
 
 2. **Monitor query execution time**:
    - Target: < 2 seconds per batch query
-   - If > 5 seconds: Reduce batch size or add indexes
+   - If > 5 seconds: Reduce batch size or apply optimizations above
 
 3. **Check for table bloat**:
    ```sql
@@ -370,4 +569,47 @@ defaults:
 s3:
   multipart_threshold_mb: 10
 ```
+
+## Quick Reference: Non-Index Optimizations
+
+**Priority order** (biggest impact first):
+
+1. **Reduce batch size** → 30-50% faster
+   ```yaml
+   batch_size: 5000  # Instead of 10000
+   ```
+
+2. **Increase work_mem** → 20-40% faster
+   ```sql
+   SET work_mem = '256MB';
+   ```
+
+3. **Enable parallel scans** → 2-4x faster (multi-core)
+   ```ini
+   max_parallel_workers_per_gather = 4
+   ```
+
+4. **Run VACUUM ANALYZE** → 10-30% faster
+   ```sql
+   VACUUM ANALYZE public.auditlog_log_line;
+   ```
+
+5. **Reduce table bloat** → 20-50% faster (if bloated)
+   ```sql
+   VACUUM FULL public.auditlog_log_line;  -- During maintenance
+   ```
+
+6. **Increase shared_buffers** → 10-30% faster
+   ```ini
+   shared_buffers = '2GB'  # 25% of RAM
+   ```
+
+7. **Narrow retention window** → 30-60% faster
+   ```yaml
+   retention_days: 30  # Instead of 90
+   ```
+
+**Combined impact**: 2-5x faster without adding indexes!
+
+**Storage impact**: Zero (no indexes added)
 

@@ -1,6 +1,7 @@
 """Unit tests for database module."""
 
 import os
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,6 +9,37 @@ import pytest
 from archiver.config import DatabaseConfig, TableConfig
 from archiver.database import DatabaseManager
 from archiver.exceptions import DatabaseError
+
+
+def create_mock_pool_with_conn(mock_conn: AsyncMock) -> MagicMock:
+    """Create a mock pool that properly supports async context manager protocol.
+
+    Args:
+        mock_conn: Mock connection object
+
+    Returns:
+        Mock pool with acquire() supporting both await and async context manager
+    """
+    mock_pool = MagicMock()
+    
+    # pool.acquire() needs to support both patterns:
+    # 1. async with pool.acquire() as conn: (used in _ensure_pool_healthy)
+    # 2. conn = await pool.acquire() (used in acquire_connection)
+    
+    # Create a mock that works as both async context manager and awaitable
+    # Use a coroutine function to avoid event loop binding issues
+    async def acquire_coro():
+        return mock_conn
+    
+    # pool.acquire() is an async context manager (used in both _ensure_pool_healthy and acquire_connection)
+    mock_acquire_context = MagicMock()
+    mock_acquire_context.__aenter__ = AsyncMock(return_value=mock_conn, unsafe=True)
+    mock_acquire_context.__aexit__ = AsyncMock(return_value=None, unsafe=True)
+    
+    # pool.acquire() returns the context manager
+    mock_pool.acquire = MagicMock(return_value=mock_acquire_context)
+    mock_pool.release = AsyncMock(unsafe=True)
+    return mock_pool
 
 
 @pytest.fixture
@@ -189,7 +221,9 @@ async def test_database_manager_acquire_connection_not_initialized(
     """Test acquire_connection fails when pool not initialized."""
     manager = DatabaseManager(db_config)
 
-    with pytest.raises(DatabaseError, match="Connection pool not initialized"):
+    # With connection resilience, it will try to reconnect automatically
+    # So we expect a connection error instead
+    with pytest.raises(DatabaseError, match="Failed to create connection pool"):
         async with manager.acquire_connection():
             pass
 
@@ -199,11 +233,9 @@ async def test_database_manager_fetchval(db_config: DatabaseConfig) -> None:
     """Test fetchval method."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = AsyncMock()
     mock_conn = AsyncMock()
     mock_conn.fetchval = AsyncMock(return_value=42)
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
@@ -217,11 +249,9 @@ async def test_database_manager_fetchval_error(db_config: DatabaseConfig) -> Non
     """Test fetchval raises DatabaseError on failure."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = AsyncMock()
     mock_conn = AsyncMock()
     mock_conn.fetchval = AsyncMock(side_effect=Exception("Query failed"))
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
@@ -234,18 +264,15 @@ async def test_database_manager_execute(db_config: DatabaseConfig) -> None:
     """Test execute method."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.execute = AsyncMock(return_value="INSERT 0 1")
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     result = await manager.execute("INSERT INTO test VALUES ($1)", "value")
     assert result == "INSERT 0 1"
     mock_conn.execute.assert_called_once_with("INSERT INTO test VALUES ($1)", "value")
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -253,17 +280,14 @@ async def test_database_manager_execute_error(db_config: DatabaseConfig) -> None
     """Test execute raises DatabaseError on failure."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.execute = AsyncMock(side_effect=Exception("Query failed"))
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     with pytest.raises(DatabaseError, match="Query execution failed"):
         await manager.execute("INSERT INTO invalid_table VALUES ($1)", "value")
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -271,19 +295,16 @@ async def test_database_manager_fetch(db_config: DatabaseConfig) -> None:
     """Test fetch method."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_records = [MagicMock(), MagicMock()]
     mock_conn.fetch = AsyncMock(return_value=mock_records)
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     result = await manager.fetch("SELECT * FROM test")
     assert result == mock_records
     mock_conn.fetch.assert_called_once_with("SELECT * FROM test")
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -291,17 +312,14 @@ async def test_database_manager_fetch_error(db_config: DatabaseConfig) -> None:
     """Test fetch raises DatabaseError on failure."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.fetch = AsyncMock(side_effect=Exception("Query failed"))
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     with pytest.raises(DatabaseError, match="Query execution failed"):
         await manager.fetch("SELECT * FROM invalid_table")
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -309,19 +327,16 @@ async def test_database_manager_fetchrow(db_config: DatabaseConfig) -> None:
     """Test fetchrow method."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_record = MagicMock()
     mock_conn.fetchrow = AsyncMock(return_value=mock_record)
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     result = await manager.fetchrow("SELECT * FROM test WHERE id = $1", 1)
     assert result == mock_record
     mock_conn.fetchrow.assert_called_once_with("SELECT * FROM test WHERE id = $1", 1)
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -329,17 +344,14 @@ async def test_database_manager_fetchrow_none(db_config: DatabaseConfig) -> None
     """Test fetchrow returns None when no row found."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.fetchrow = AsyncMock(return_value=None)
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     result = await manager.fetchrow("SELECT * FROM test WHERE id = $1", 999)
     assert result is None
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -347,14 +359,12 @@ async def test_database_manager_fetchone(db_config: DatabaseConfig) -> None:
     """Test fetchone method."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_record = MagicMock()
     mock_record.__getitem__ = lambda self, key: {"id": 1, "name": "test"}[key]
     mock_record.keys = lambda: ["id", "name"]
     mock_conn.fetchrow = AsyncMock(return_value=mock_record)
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
@@ -362,7 +372,6 @@ async def test_database_manager_fetchone(db_config: DatabaseConfig) -> None:
     assert result is not None
     assert result == {"id": 1, "name": "test"}
     mock_conn.fetchrow.assert_called_once_with("SELECT * FROM test WHERE id = $1", 1)
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -370,17 +379,14 @@ async def test_database_manager_fetchone_none(db_config: DatabaseConfig) -> None
     """Test fetchone returns None when no row found."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.fetchrow = AsyncMock(return_value=None)
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     result = await manager.fetchone("SELECT * FROM test WHERE id = $1", 999)
     assert result is None
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -388,17 +394,14 @@ async def test_database_manager_get_postgres_version(db_config: DatabaseConfig) 
     """Test get_postgres_version method."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.fetchval = AsyncMock(return_value="PostgreSQL 14.5")
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     version = await manager.get_postgres_version()
     assert version == "14.5"
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -406,17 +409,14 @@ async def test_database_manager_get_postgres_version_unknown(db_config: Database
     """Test get_postgres_version with unknown format."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.fetchval = AsyncMock(return_value="Unknown version string")
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     version = await manager.get_postgres_version()
     assert version == "unknown"
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio
@@ -424,17 +424,14 @@ async def test_database_manager_get_postgres_version_none(db_config: DatabaseCon
     """Test get_postgres_version when version is None."""
     manager = DatabaseManager(db_config)
 
-    mock_pool = MagicMock()
     mock_conn = AsyncMock()
     mock_conn.fetchval = AsyncMock(return_value=None)
-    mock_pool.acquire = AsyncMock(return_value=mock_conn)
-    mock_pool.release = AsyncMock()
+    mock_pool = create_mock_pool_with_conn(mock_conn)
 
     manager.pool = mock_pool
 
     version = await manager.get_postgres_version()
     assert version == "unknown"
-    mock_pool.release.assert_called_once_with(mock_conn)
 
 
 @pytest.mark.asyncio

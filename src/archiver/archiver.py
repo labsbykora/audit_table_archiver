@@ -27,10 +27,13 @@ from archiver.metrics import ArchiverMetrics
 from archiver.multipart_cleanup import MultipartCleanup
 from archiver.notification_manager import EnhancedNotificationManager
 from archiver.progress_tracker import ProgressTracker
+from archiver.query_analyzer import QueryAnalyzer
 from archiver.retention_policy import RetentionPolicyEnforcer
 from archiver.s3_client import S3Client
 from archiver.sample_verifier import SampleVerifier
 from archiver.schema_detector import SchemaDetector
+from archiver.upload_pipeline import UploadPipeline, UploadTask
+from archiver.vacuum_manager import VacuumManager
 from archiver.schema_drift import SchemaDriftDetector
 from archiver.serializer import PostgreSQLSerializer
 from archiver.verifier import Verifier
@@ -74,6 +77,7 @@ class Archiver:
             fail_on_drift=defaults.fail_on_schema_drift,
             logger=self.logger,
         )
+        self.vacuum_manager = VacuumManager(logger=self.logger)
         self.watermark_manager = WatermarkManager(
             storage_type=defaults.watermark_storage_type,
             logger=self.logger,
@@ -174,6 +178,8 @@ class Archiver:
             "records_archived_this_run": 0,  # This run only
             "records_archived_total": 0,  # Overall (including checkpoint)
             "batches_processed": 0,
+            "total_failed_batches": 0,
+            "failed_batches": {},  # Track failed batches per table
             "start_time": datetime.now(timezone.utc).isoformat(),
             "database_stats": [],  # Per-database statistics
         }
@@ -197,9 +203,19 @@ class Archiver:
 
         stats["end_time"] = datetime.now(timezone.utc).isoformat()
 
+        # Count failed batches across all tables
+        total_failed_batches = 0
+        if "failed_batches" in stats:
+            for table_failures in stats["failed_batches"].values():
+                total_failed_batches += len(table_failures)
+        stats["total_failed_batches"] = total_failed_batches
+
         # Determine final status
         if stats["databases_failed"] == 0 and stats["tables_failed"] == 0:
-            final_status = "success"
+            if total_failed_batches > 0:
+                final_status = "partial"  # Some batches failed but tables completed
+            else:
+                final_status = "success"
         elif stats["databases_processed"] > 0 or stats["tables_processed"] > 0:
             final_status = "partial"
         else:
@@ -593,7 +609,26 @@ class Archiver:
             s3_client=s3_client,
         )
 
-        batch_processor = BatchProcessor(db_manager, db_config, table_config, logger=self.logger)
+        # Initialize query analyzer if enabled
+        query_analyzer = None
+        if getattr(self.config.defaults, "query_plan_analysis", True):
+            query_analyzer = QueryAnalyzer(
+                logger=self.logger,
+                slow_query_threshold=getattr(
+                    self.config.defaults, "slow_query_threshold", 2.0
+                ),
+                warn_on_seq_scan=getattr(
+                    self.config.defaults, "warn_on_seq_scan", True
+                ),
+            )
+
+        batch_processor = BatchProcessor(
+            db_manager,
+            db_config,
+            table_config,
+            logger=self.logger,
+            query_analyzer=query_analyzer,
+        )
 
         # Detect table schema (for first batch or schema tracking)
         table_schema = None
@@ -798,8 +833,47 @@ class Archiver:
         is_first_batch = True  # Track first batch for schema inclusion
         s3_key = None  # Track S3 key for notifications
 
+        # Initialize upload pipeline if enabled
+        upload_pipeline: Optional[UploadPipeline] = None
+        pending_upload_task: Optional[UploadTask] = None
+        if getattr(self.config.defaults, "async_upload_pipeline", False):
+            max_concurrent = getattr(self.config.defaults, "max_concurrent_uploads", 2)
+            upload_pipeline = UploadPipeline(
+                s3_client=s3_client,
+                max_concurrent_uploads=max_concurrent,
+                logger=self.logger,
+            )
+            self.logger.info(
+                "Async upload pipeline enabled",
+                database=db_config.name,
+                table=table_config.name,
+                max_concurrent_uploads=max_concurrent,
+            )
+
         while True:
             batch_number += 1
+
+            # Wait for previous batch upload to complete before processing next batch
+            # This maintains verify-then-delete pattern while allowing upload overlap
+            if pending_upload_task and upload_pipeline:
+                try:
+                    await upload_pipeline.wait_for_upload(pending_upload_task)
+                    self.logger.debug(
+                        "Previous batch upload completed",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number - 1,
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        "Previous batch upload failed",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number - 1,
+                        error=str(e),
+                    )
+                    raise
+                pending_upload_task = None
             self.logger.debug(
                 "Processing batch",
                 database=db_config.name,
@@ -896,10 +970,102 @@ class Archiver:
                                 error=str(e),
                             )
 
+                    # Wait for any pending uploads before finishing
+                    if pending_upload_task and upload_pipeline:
+                        try:
+                            await upload_pipeline.wait_for_upload(pending_upload_task)
+                        except Exception as e:
+                            self.logger.error(
+                                "Final batch upload failed",
+                                database=db_config.name,
+                                table=table_config.name,
+                                error=str(e),
+                            )
+                            raise
+
+                    # Wait for all remaining uploads
+                    if upload_pipeline:
+                        try:
+                            await upload_pipeline.wait_for_all()
+                        except Exception as e:
+                            self.logger.error(
+                                "Failed to complete all uploads",
+                                database=db_config.name,
+                                table=table_config.name,
+                                error=str(e),
+                            )
+                            raise
+
+                    # Run vacuum to reclaim space (if enabled)
+                    # Check table-level config first, then fall back to defaults
+                    vacuum_after_archive = (
+                        table_config.vacuum_after_archive
+                        if table_config.vacuum_after_archive is not None
+                        else self.config.defaults.vacuum_after_archive
+                    )
+                    vacuum_type = (
+                        table_config.vacuum_type
+                        if table_config.vacuum_type is not None
+                        else self.config.defaults.vacuum_type
+                    )
+
+                    if vacuum_after_archive:
+                        try:
+                            vacuum_result = await self.vacuum_manager.vacuum_table_after_archive(
+                                db_manager=db_manager,
+                                schema_name=table_config.schema_name,
+                                table_name=table_config.name,
+                                vacuum_type=vacuum_type,
+                                dry_run=self.dry_run,
+                            )
+
+                            # Log vacuum results
+                            if vacuum_result.get("success"):
+                                space_reclaimed = vacuum_result.get("space_reclaimed")
+                                if space_reclaimed:
+                                    total_mb = space_reclaimed["total_size_bytes"] / (1024 * 1024)
+                                    self.logger.info(
+                                        "Space reclaimed after archival",
+                                        database=db_config.name,
+                                        table=table_config.name,
+                                        schema=table_config.schema_name,
+                                        total_size_reclaimed_mb=total_mb,
+                                        vacuum_type=vacuum_result.get("vacuum_type"),
+                                        duration_seconds=vacuum_result.get("duration_seconds", 0),
+                                    )
+                                else:
+                                    self.logger.info(
+                                        "Vacuum completed (no size tracking available)",
+                                        database=db_config.name,
+                                        table=table_config.name,
+                                        schema=table_config.schema_name,
+                                        vacuum_type=vacuum_result.get("vacuum_type"),
+                                        duration_seconds=vacuum_result.get("duration_seconds", 0),
+                                    )
+                            else:
+                                # Vacuum failed but don't fail the archival
+                                self.logger.warning(
+                                    "Vacuum failed (non-critical - archival succeeded)",
+                                    database=db_config.name,
+                                    table=table_config.name,
+                                    schema=table_config.schema_name,
+                                    error=vacuum_result.get("error"),
+                                )
+                        except Exception as e:
+                            # Log but don't fail - vacuum is non-critical
+                            self.logger.warning(
+                                "Vacuum operation failed (non-critical - archival succeeded)",
+                                database=db_config.name,
+                                table=table_config.name,
+                                schema=table_config.schema_name,
+                                error=str(e),
+                                exc_info=True,
+                            )
+
                     break
 
                 # Process batch
-                s3_key = await self._process_batch(
+                s3_key, batch_upload_task = await self._process_batch(
                     db_manager,
                     s3_client,
                     batch_processor,
@@ -911,7 +1077,12 @@ class Archiver:
                     table_schema=(
                         table_schema if is_first_batch else None
                     ),  # Pass schema for first batch
+                    upload_pipeline=upload_pipeline,
                 )
+
+                # Track upload task for next iteration
+                if batch_upload_task:
+                    pending_upload_task = batch_upload_task
 
                 # Update cursor for next batch
                 record_dicts = batch_processor.records_to_dicts(records)
@@ -1032,15 +1203,181 @@ class Archiver:
                             )
 
             except Exception as e:
-                self.logger.error(
-                    "Batch processing failed",
-                    database=db_config.name,
-                    table=table_config.name,
-                    batch=batch_number,
-                    error=str(e),
-                    exc_info=True,
+                # Batch-level error recovery
+                batch_retry_attempts = getattr(
+                    self.config.defaults, "batch_retry_attempts", 3
                 )
-                raise
+                skip_failed_batches = getattr(
+                    self.config.defaults, "skip_failed_batches", False
+                )
+                max_failed_batches = getattr(
+                    self.config.defaults, "max_failed_batches", 10
+                )
+
+                # Track failed batches
+                failed_batches_key = f"{db_config.name}.{table_config.name}"
+                if "failed_batches" not in stats:
+                    stats["failed_batches"] = {}
+                if failed_batches_key not in stats["failed_batches"]:
+                    stats["failed_batches"][failed_batches_key] = []
+
+                failed_batch_info = {
+                    "batch_number": batch_number,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                stats["failed_batches"][failed_batches_key].append(failed_batch_info)
+
+                # Check if we've exceeded max failed batches
+                total_failed = len(stats["failed_batches"][failed_batches_key])
+                if total_failed >= max_failed_batches:
+                    self.logger.error(
+                        "Maximum failed batches exceeded, stopping table archival",
+                        database=db_config.name,
+                        table=table_config.name,
+                        failed_batches=total_failed,
+                        max_failed_batches=max_failed_batches,
+                    )
+                    raise
+
+                # Retry logic
+                if batch_retry_attempts > 0:
+                    retry_success = False
+                    for retry_attempt in range(batch_retry_attempts):
+                        try:
+                            self.logger.warning(
+                                "Retrying failed batch",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                                retry_attempt=retry_attempt + 1,
+                                max_retries=batch_retry_attempts,
+                                error=str(e),
+                            )
+
+                            # Re-select the same batch
+                            retry_records = await batch_processor.select_batch(
+                                batch_size=table_config.batch_size
+                                or self.config.defaults.batch_size,
+                                last_timestamp=last_timestamp,
+                                last_primary_key=last_primary_key,
+                            )
+
+                            if not retry_records:
+                                # No more records, break out of retry loop
+                                break
+
+                            # Process retry batch
+                            await self._process_batch(
+                                db_manager,
+                                s3_client,
+                                batch_processor,
+                                db_config,
+                                table_config,
+                                retry_records,
+                                batch_number,
+                                stats,
+                                table_schema=(
+                                    table_schema if is_first_batch else None
+                                ),
+                            )
+
+                            # Success - update cursor and continue
+                            retry_record_dicts = batch_processor.records_to_dicts(
+                                retry_records
+                            )
+                            last_timestamp, last_primary_key = (
+                                batch_processor.get_last_cursor(retry_record_dicts)
+                            )
+
+                            stats["batches_processed"] += 1
+                            stats["records_archived"] += len(retry_records)
+                            records_archived_so_far += len(retry_records)
+                            records_archived_this_run += len(retry_records)
+                            batches_processed_so_far += 1
+
+                            # Remove from failed batches (retry succeeded)
+                            stats["failed_batches"][failed_batches_key].pop()
+
+                            self.logger.info(
+                                "Batch retry succeeded",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                                retry_attempt=retry_attempt + 1,
+                            )
+
+                            retry_success = True
+                            is_first_batch = False
+                            break
+
+                        except Exception as retry_error:
+                            retry_delay = (
+                                self.config.defaults.batch_retry_delay
+                                * (2 ** retry_attempt)
+                            )  # Exponential backoff
+                            self.logger.warning(
+                                "Batch retry failed, will retry again",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                                retry_attempt=retry_attempt + 1,
+                                retry_delay=retry_delay,
+                                error=str(retry_error),
+                            )
+                            if retry_attempt < batch_retry_attempts - 1:
+                                await asyncio.sleep(retry_delay)
+
+                    if retry_success:
+                        # Continue to next batch
+                        continue
+
+                # All retries exhausted or retry disabled
+                if skip_failed_batches:
+                    self.logger.error(
+                        "Batch processing failed, skipping batch and continuing",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number,
+                        error=str(e),
+                        failed_batches=total_failed,
+                        max_failed_batches=max_failed_batches,
+                    )
+                    # Skip this batch and continue to next
+                    # Note: We don't update cursor, so we'll try the same batch again
+                    # This could cause infinite loop if batch keeps failing
+                    # Better approach: advance cursor to skip failed batch
+                    try:
+                        # Try to get cursor from failed batch to skip it
+                        record_dicts = batch_processor.records_to_dicts(records)
+                        if record_dicts:
+                            last_timestamp, last_primary_key = (
+                                batch_processor.get_last_cursor(record_dicts)
+                            )
+                            self.logger.info(
+                                "Skipping failed batch, advancing cursor",
+                                database=db_config.name,
+                                table=table_config.name,
+                                batch=batch_number,
+                            )
+                    except Exception:
+                        # If we can't get cursor, we'll retry same batch next iteration
+                        # This is a limitation of skip-on-failure
+                        pass
+                    continue
+                else:
+                    # Fail fast - raise exception
+                    self.logger.error(
+                        "Batch processing failed, stopping table archival",
+                        database=db_config.name,
+                        table=table_config.name,
+                        batch=batch_number,
+                        error=str(e),
+                        failed_batches=total_failed,
+                        exc_info=True,
+                    )
+                    raise
 
     async def _process_batch(
         self,
@@ -1053,10 +1390,12 @@ class Archiver:
         batch_number: int,
         stats: dict[str, Any],
         table_schema: Optional[dict[str, Any]] = None,
-    ) -> Optional[str]:
+        upload_pipeline: Optional[UploadPipeline] = None,
+    ) -> tuple[Optional[str], Optional[UploadTask]]:
         """Process a single batch following verify-then-delete pattern.
 
         Pattern: FETCH → UPLOAD → VERIFY → DELETE → COMMIT
+        With async pipeline: FETCH → START_UPLOAD (async) → VERIFY (wait) → DELETE → COMMIT
 
         Args:
             db_manager: Database manager
@@ -1067,6 +1406,11 @@ class Archiver:
             records: Records to process
             batch_number: Batch number
             stats: Statistics dictionary
+            table_schema: Optional table schema
+            upload_pipeline: Optional upload pipeline for async uploads
+
+        Returns:
+            Tuple of (s3_key, upload_task) where upload_task is None if sync upload
         """
         # Generate batch ID
         batch_id = self._generate_batch_id(db_config.name, table_config.name, batch_number)
@@ -1195,34 +1539,49 @@ class Archiver:
                 tmp_path = Path(tmp_file.name)
                 tmp_path.write_bytes(compressed_data)
 
-            # Close the file handle before uploading (fixes Windows file locking issue)
-            try:
+            # Upload file (async if pipeline enabled, sync otherwise)
+            upload_task: Optional[UploadTask] = None
+            if upload_pipeline:
+                # Start async upload
                 if self.metrics:
                     self.metrics.start_phase_timer("upload")
-                _ = s3_client.upload_file(tmp_path, s3_key)
-                if self.metrics:
-                    self.metrics.stop_phase_timer(
-                        database=db_config.name,
-                        table=table_config.name,
-                        schema=table_config.schema_name,
-                        phase="upload",
-                    )
+                upload_task = await upload_pipeline.start_upload(tmp_path, s3_key)
                 self.logger.debug(
-                    "File uploaded to S3",
+                    "File upload started (async)",
                     bucket=self.config.s3.bucket,
                     key=s3_key,
                     size=compressed_size,
                 )
-            finally:
-                # Delete temp file after upload completes
+                # Don't delete temp file yet - will be deleted after upload completes
+            else:
+                # Synchronous upload (original behavior)
                 try:
-                    tmp_path.unlink()
-                except Exception as e:
-                    self.logger.warning(
-                        "Failed to delete temporary file",
-                        path=str(tmp_path),
-                        error=str(e),
+                    if self.metrics:
+                        self.metrics.start_phase_timer("upload")
+                    _ = s3_client.upload_file(tmp_path, s3_key)
+                    if self.metrics:
+                        self.metrics.stop_phase_timer(
+                            database=db_config.name,
+                            table=table_config.name,
+                            schema=table_config.schema_name,
+                            phase="upload",
+                        )
+                    self.logger.debug(
+                        "File uploaded to S3",
+                        bucket=self.config.s3.bucket,
+                        key=s3_key,
+                        size=compressed_size,
                     )
+                finally:
+                    # Delete temp file after upload completes
+                    try:
+                        tmp_path.unlink()
+                    except Exception as e:
+                        self.logger.warning(
+                            "Failed to delete temporary file",
+                            path=str(tmp_path),
+                            error=str(e),
+                        )
 
             # Upload metadata file
             metadata_filename = filename.replace(".jsonl.gz", ".metadata.json")
@@ -1257,6 +1616,34 @@ class Archiver:
                         path=str(tmp_meta_path),
                         error=str(e),
                     )
+
+        # Wait for upload to complete before verification (if async)
+        if upload_task and upload_pipeline:
+            try:
+                await upload_pipeline.wait_for_upload(upload_task)
+                if self.metrics:
+                    self.metrics.stop_phase_timer(
+                        database=db_config.name,
+                        table=table_config.name,
+                        schema=table_config.schema_name,
+                        phase="upload",
+                    )
+                # Delete temp file after upload completes
+                try:
+                    tmp_path.unlink()
+                except Exception as e:
+                    self.logger.warning(
+                        "Failed to delete temporary file",
+                        path=str(tmp_path),
+                        error=str(e),
+                    )
+            except Exception as e:
+                # Clean up temp file on error
+                try:
+                    tmp_path.unlink()
+                except Exception:
+                    pass
+                raise
 
         # Verify counts
         if self.metrics:
@@ -1474,7 +1861,7 @@ class Archiver:
         )
 
         # Return S3 key for tracking at table level
-        return s3_key
+        return s3_key, upload_task
 
     def _generate_batch_id(self, database: str, table: str, batch_number: int) -> str:
         """Generate deterministic batch ID.

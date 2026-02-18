@@ -287,15 +287,21 @@ All planned features are complete:
 - [Requirements Document](audit_archiver_requirements.md)
 - [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
-### Operations
+### Operational Guides
+- **[Error Recovery Guide](docs/error-recovery-guide.md)** - Step-by-step error recovery procedures
+- **[Operational Runbooks](docs/operational-runbooks.md)** - Common operational tasks and troubleshooting
+- **[Query Optimization Guide](docs/query-optimization-guide.md)** - Database query optimization strategies
 - [Operations Manual](docs/operations-manual.md)
 - [Runbooks](docs/runbooks.md)
 - [Troubleshooting Guide](docs/troubleshooting.md)
 - [FAQ](docs/faq.md)
 
-### Guides
-- [Multi-Database Guide](docs/multi-database-guide.md)
+### Performance & Tuning
 - [Performance Tuning Guide](docs/performance-tuning.md)
+- [Query Optimization Guide](docs/query-optimization-guide.md)
+- [Multi-Database Guide](docs/multi-database-guide.md)
+
+### Additional Guides
 - [Compliance & Governance Guide](docs/compliance-guide.md)
 - [Manual Restore Guide](docs/manual-restore-guide.md)
 - [Security & Credentials](docs/security-credentials.md)

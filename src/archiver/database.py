@@ -1,5 +1,6 @@
 """Database connection and query management using asyncpg."""
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, Optional
@@ -10,6 +11,7 @@ from structlog import BoundLogger
 from archiver.config import DatabaseConfig
 from archiver.exceptions import DatabaseError
 from utils.logging import get_logger
+from utils.retry import RetryConfig, retry_async
 
 
 class DatabaseManager:
@@ -20,6 +22,7 @@ class DatabaseManager:
         config: DatabaseConfig,
         pool_size: int = 5,
         logger: Optional[BoundLogger] = None,
+        max_reconnect_attempts: int = 3,
     ) -> None:
         """Initialize database manager.
 
@@ -27,12 +30,26 @@ class DatabaseManager:
             config: Database configuration
             pool_size: Connection pool size
             logger: Optional logger instance
+            max_reconnect_attempts: Maximum reconnection attempts (default: 3)
         """
         self.config = config
         self.pool_size = pool_size
         self.logger = logger or get_logger("database")
         self.pool: Optional[asyncpg.Pool] = None
         self._dsn: Optional[str] = None
+        self.max_reconnect_attempts = max_reconnect_attempts
+        self._reconnect_config = RetryConfig(
+            max_attempts=max_reconnect_attempts,
+            initial_delay=1.0,
+            max_delay=10.0,
+            exponential_base=2.0,
+            retryable_exceptions=(
+                asyncpg.PostgresConnectionError,
+                asyncpg.ConnectionDoesNotExistError,
+                OSError,
+                ConnectionError,
+            ),
+        )
 
     @property
     def dsn(self) -> str:
@@ -53,14 +70,23 @@ class DatabaseManager:
         return self._dsn
 
     async def connect(self) -> None:
-        """Create connection pool."""
-        try:
+        """Create connection pool with automatic retry on failure."""
+        async def _connect_internal() -> None:
+            """Internal connection function for retry logic."""
             self.logger.debug(
                 "Creating connection pool",
                 database=self.config.name,
                 host=self.config.host,
                 pool_size=self.pool_size,
             )
+
+            # Close existing pool if reconnecting
+            if self.pool:
+                try:
+                    await self.pool.close()
+                except Exception:
+                    pass  # Ignore errors when closing failed pool
+                self.pool = None
 
             self.pool = await asyncpg.create_pool(
                 self.dsn,
@@ -81,10 +107,20 @@ class DatabaseManager:
                     version=version.split(",")[0] if version else "unknown",
                 )
 
+        try:
+            await retry_async(
+                _connect_internal,
+                config=self._reconnect_config,
+                logger=self.logger,
+            )
         except Exception as e:
             raise DatabaseError(
-                f"Failed to create connection pool: {e}",
-                context={"database": self.config.name, "host": self.config.host},
+                f"Failed to create connection pool after {self.max_reconnect_attempts} attempts: {e}",
+                context={
+                    "database": self.config.name,
+                    "host": self.config.host,
+                    "attempts": self.max_reconnect_attempts,
+                },
             ) from e
 
     async def disconnect(self) -> None:
@@ -111,27 +147,54 @@ class DatabaseManager:
             self.logger.warning("Health check failed", error=str(e))
             return False
 
+    async def _ensure_pool_healthy(self) -> None:
+        """Ensure connection pool is healthy, reconnect if needed."""
+        if not self.pool:
+            self.logger.warning(
+                "Connection pool not initialized, attempting to reconnect",
+                database=self.config.name,
+            )
+            await self.connect()
+            return
+
+        # Check if pool is still valid
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+        except (
+            asyncpg.PostgresConnectionError,
+            asyncpg.ConnectionDoesNotExistError,
+            OSError,
+            ConnectionError,
+        ) as e:
+            self.logger.warning(
+                "Connection pool unhealthy, attempting to reconnect",
+                database=self.config.name,
+                error=str(e),
+            )
+            await self.connect()
+
     @asynccontextmanager
     async def acquire_connection(self) -> AsyncGenerator[asyncpg.Connection, None]:
-        """Acquire a connection from the pool.
+        """Acquire a connection from the pool with automatic reconnection.
 
         Yields:
             Database connection
 
         Raises:
-            DatabaseError: If pool is not initialized or connection fails
+            DatabaseError: If pool cannot be initialized or connection fails
         """
+        await self._ensure_pool_healthy()
+
         if not self.pool:
             raise DatabaseError(
                 "Connection pool not initialized. Call connect() first.",
                 context={"database": self.config.name},
             )
 
-        conn = await self.pool.acquire()
-        try:
+        # pool.acquire() is an async context manager, use it properly
+        async with self.pool.acquire() as conn:
             yield conn
-        finally:
-            await self.pool.release(conn)
 
     @asynccontextmanager
     async def transaction(self) -> AsyncGenerator[asyncpg.Connection, None]:
@@ -154,7 +217,7 @@ class DatabaseManager:
                 yield conn
 
     async def execute(self, query: str, *args: Any) -> str:
-        """Execute a query that doesn't return rows.
+        """Execute a query that doesn't return rows with automatic retry.
 
         Args:
             query: SQL query
@@ -164,19 +227,30 @@ class DatabaseManager:
             Command status string
 
         Raises:
-            DatabaseError: If execution fails
+            DatabaseError: If execution fails after retries
         """
-        try:
+        async def _execute_internal() -> str:
             async with self.acquire_connection() as conn:
                 return await conn.execute(query, *args)
+
+        try:
+            return await retry_async(
+                _execute_internal,
+                config=self._reconnect_config,
+                logger=self.logger,
+            )
         except Exception as e:
             raise DatabaseError(
                 f"Query execution failed: {e}",
-                context={"database": self.config.name, "query": query[:100]},
+                context={
+                    "database": self.config.name,
+                    "query": query[:100],
+                    "attempts": self.max_reconnect_attempts,
+                },
             ) from e
 
     async def fetch(self, query: str, *args: Any) -> list[asyncpg.Record]:
-        """Execute a query and return all rows.
+        """Execute a query and return all rows with automatic retry.
 
         Args:
             query: SQL query
@@ -186,19 +260,30 @@ class DatabaseManager:
             List of records
 
         Raises:
-            DatabaseError: If execution fails
+            DatabaseError: If execution fails after retries
         """
-        try:
+        async def _fetch_internal() -> list[asyncpg.Record]:
             async with self.acquire_connection() as conn:
                 return await conn.fetch(query, *args)
+
+        try:
+            return await retry_async(
+                _fetch_internal,
+                config=self._reconnect_config,
+                logger=self.logger,
+            )
         except Exception as e:
             raise DatabaseError(
                 f"Query execution failed: {e}",
-                context={"database": self.config.name, "query": query[:100]},
+                context={
+                    "database": self.config.name,
+                    "query": query[:100],
+                    "attempts": self.max_reconnect_attempts,
+                },
             ) from e
 
     async def fetchrow(self, query: str, *args: Any) -> Optional[asyncpg.Record]:
-        """Execute a query and return one row.
+        """Execute a query and return one row with automatic retry.
 
         Args:
             query: SQL query
@@ -208,19 +293,30 @@ class DatabaseManager:
             Single record or None
 
         Raises:
-            DatabaseError: If execution fails
+            DatabaseError: If execution fails after retries
         """
-        try:
+        async def _fetchrow_internal() -> Optional[asyncpg.Record]:
             async with self.acquire_connection() as conn:
                 return await conn.fetchrow(query, *args)
+
+        try:
+            return await retry_async(
+                _fetchrow_internal,
+                config=self._reconnect_config,
+                logger=self.logger,
+            )
         except Exception as e:
             raise DatabaseError(
                 f"Query execution failed: {e}",
-                context={"database": self.config.name, "query": query[:100]},
+                context={
+                    "database": self.config.name,
+                    "query": query[:100],
+                    "attempts": self.max_reconnect_attempts,
+                },
             ) from e
 
     async def fetchone(self, query: str, *args: Any) -> Optional[dict[str, Any]]:
-        """Execute a query and return one row as dictionary.
+        """Execute a query and return one row as dictionary with automatic retry.
 
         Args:
             query: SQL query
@@ -230,20 +326,31 @@ class DatabaseManager:
             Single record as dictionary or None
 
         Raises:
-            DatabaseError: If execution fails
+            DatabaseError: If execution fails after retries
         """
-        try:
+        async def _fetchone_internal() -> Optional[dict[str, Any]]:
             async with self.acquire_connection() as conn:
                 row = await conn.fetchrow(query, *args)
                 return dict(row) if row else None
+
+        try:
+            return await retry_async(
+                _fetchone_internal,
+                config=self._reconnect_config,
+                logger=self.logger,
+            )
         except Exception as e:
             raise DatabaseError(
                 f"Query execution failed: {e}",
-                context={"database": self.config.name, "query": query[:100]},
+                context={
+                    "database": self.config.name,
+                    "query": query[:100],
+                    "attempts": self.max_reconnect_attempts,
+                },
             ) from e
 
     async def fetchval(self, query: str, *args: Any) -> Any:
-        """Execute a query and return a single value.
+        """Execute a query and return a single value with automatic retry.
 
         Args:
             query: SQL query
@@ -253,15 +360,26 @@ class DatabaseManager:
             Single value or None
 
         Raises:
-            DatabaseError: If execution fails
+            DatabaseError: If execution fails after retries
         """
-        try:
+        async def _fetchval_internal() -> Any:
             async with self.acquire_connection() as conn:
                 return await conn.fetchval(query, *args)
+
+        try:
+            return await retry_async(
+                _fetchval_internal,
+                config=self._reconnect_config,
+                logger=self.logger,
+            )
         except Exception as e:
             raise DatabaseError(
                 f"Query execution failed: {e}",
-                context={"database": self.config.name, "query": query[:100]},
+                context={
+                    "database": self.config.name,
+                    "query": query[:100],
+                    "attempts": self.max_reconnect_attempts,
+                },
             ) from e
 
     async def get_postgres_version(self) -> str:

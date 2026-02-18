@@ -15,6 +15,12 @@ defaults:
   parallel_databases: false  # Set to true to enable parallel processing
   max_parallel_databases: 3   # Max databases to process in parallel (if parallel_databases=true)
   connection_pool_size: 5     # Default connection pool size per database
+  
+  # Batch error recovery
+  batch_retry_attempts: 3
+  batch_retry_delay: 2.0
+  skip_failed_batches: false
+  max_failed_batches: 10
 
 # S3 configuration (shared across all databases)
 s3:

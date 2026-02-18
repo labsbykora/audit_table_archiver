@@ -178,6 +178,27 @@ class TableConfig(BaseModel):
         default=False,
         description="Critical flag (enables additional safety checks)",
     )
+    vacuum_after_archive: Optional[bool] = Field(
+        default=None,
+        description="Run VACUUM after archival for this table (overrides global default)",
+    )
+    vacuum_type: Optional[str] = Field(
+        default=None,
+        description="Vacuum type for this table: 'none', 'analyze', 'standard', 'full' (overrides global default)",
+    )
+
+    @field_validator("vacuum_type")
+    @classmethod
+    def validate_vacuum_type(cls, v: Optional[str]) -> Optional[str]:
+        """Validate vacuum type."""
+        if v is None:
+            return v
+        valid_types = ["none", "analyze", "standard", "full"]
+        if v.lower() not in valid_types:
+            raise ValueError(
+                f"vacuum_type must be one of {valid_types}, got '{v}'"
+            )
+        return v.lower()
 
 
 class DatabaseConfig(BaseModel):
@@ -413,11 +434,54 @@ class DefaultsConfig(BaseModel):
         description="Sleep duration (seconds) between batches",
         ge=0,
     )
-    vacuum_after: bool = Field(default=True, description="Run VACUUM after archival")
-    vacuum_strategy: str = Field(
-        default="standard",
-        description="Vacuum strategy (none, analyze, standard, full)",
+    vacuum_after_archive: bool = Field(
+        default=False,
+        description="Run VACUUM after archival to reclaim space (default: False for safety)",
     )
+    vacuum_type: str = Field(
+        default="analyze",
+        description="Vacuum type: 'none' (disabled), 'analyze' (VACUUM ANALYZE - lightweight, updates stats), 'standard' (VACUUM - lightweight, reclaims space), 'full' (VACUUM FULL - aggressive, locks table)",
+    )
+
+    @field_validator("vacuum_type")
+    @classmethod
+    def validate_vacuum_type(cls, v: str) -> str:
+        """Validate vacuum type."""
+        valid_types = ["none", "analyze", "standard", "full"]
+        if v.lower() not in valid_types:
+            raise ValueError(
+                f"vacuum_type must be one of {valid_types}, got '{v}'"
+            )
+        return v.lower()
+
+    # Legacy fields for backward compatibility (deprecated)
+    vacuum_after: Optional[bool] = Field(
+        default=None,
+        description="[DEPRECATED] Use vacuum_after_archive instead. Run VACUUM after archival",
+    )
+    vacuum_strategy: Optional[str] = Field(
+        default=None,
+        description="[DEPRECATED] Use vacuum_type instead. Vacuum strategy (none, analyze, standard, full)",
+    )
+
+    @model_validator(mode="after")
+    def handle_legacy_vacuum_fields(self) -> "DefaultsConfig":
+        """Handle legacy vacuum fields for backward compatibility."""
+        # If new fields are not set but legacy fields are, use legacy values
+        if self.vacuum_after_archive is False and self.vacuum_after is not None:
+            self.vacuum_after_archive = self.vacuum_after
+        if self.vacuum_type == "analyze" and self.vacuum_strategy is not None:
+            # Map old strategy names to new type names
+            strategy_map = {
+                "none": "none",
+                "analyze": "analyze",
+                "standard": "standard",
+                "full": "full",
+            }
+            self.vacuum_type = strategy_map.get(
+                self.vacuum_strategy.lower(), "analyze"
+            )
+        return self
     parallel_databases: bool = Field(
         default=False,
         description="Enable parallel database processing (default: sequential)",
@@ -464,6 +528,49 @@ class DefaultsConfig(BaseModel):
     audit_trail_storage_type: str = Field(
         default="s3",
         description="Storage backend for audit trail (s3, database)",
+    )
+    batch_retry_attempts: int = Field(
+        default=3,
+        description="Number of retry attempts for failed batches",
+        ge=0,
+        le=10,
+    )
+    batch_retry_delay: float = Field(
+        default=2.0,
+        description="Initial delay between batch retry attempts (seconds)",
+        ge=0,
+    )
+    skip_failed_batches: bool = Field(
+        default=False,
+        description="Skip failed batches and continue processing (use with caution)",
+    )
+    max_failed_batches: int = Field(
+        default=10,
+        description="Maximum number of failed batches before stopping table archival",
+        ge=1,
+    )
+    query_plan_analysis: bool = Field(
+        default=True,
+        description="Enable query plan analysis for performance monitoring",
+    )
+    slow_query_threshold: float = Field(
+        default=2.0,
+        description="Log queries slower than this threshold (seconds)",
+        ge=0,
+    )
+    warn_on_seq_scan: bool = Field(
+        default=True,
+        description="Warn when sequential scans are detected (indicates missing index)",
+    )
+    async_upload_pipeline: bool = Field(
+        default=False,
+        description="Enable async upload pipeline for overlapping uploads (experimental)",
+    )
+    max_concurrent_uploads: int = Field(
+        default=2,
+        description="Maximum concurrent uploads when async pipeline is enabled",
+        ge=1,
+        le=5,
     )
 
 
