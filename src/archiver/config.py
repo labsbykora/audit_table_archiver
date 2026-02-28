@@ -218,7 +218,11 @@ class DatabaseConfig(BaseModel):
     )
     read_replica: Optional[str] = Field(
         default=None,
-        description="Read replica host (optional)",
+        description="Read replica host (optional, deprecated - use read_replicas)",
+    )
+    read_replicas: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description="List of read replica configurations (host, port, weight)",
     )
     connection_pool_size: Optional[int] = Field(
         default=None,
@@ -238,6 +242,31 @@ class DatabaseConfig(BaseModel):
             )
         if self.password_env and self.password:
             raise ValueError(
+                "Cannot specify both 'password_env' and 'password'. "
+                "Use 'password_env' for production (recommended) or 'password' for development only."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def handle_legacy_read_replica(self) -> "DatabaseConfig":
+        """Handle backward compatibility for legacy read_replica field."""
+        if self.read_replica and not self.read_replicas:
+            # Convert legacy single replica to new format
+            self.read_replicas = [
+                {
+                    "host": self.read_replica,
+                    "port": self.port,
+                    "weight": 1.0,
+                }
+            ]
+            import warnings
+
+            warnings.warn(
+                "The 'read_replica' field is deprecated. Use 'read_replicas' list instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self
                 "Cannot specify both 'password_env' and 'password'. "
                 "Use 'password_env' for production (recommended) or 'password' for development only."
             )
@@ -549,6 +578,13 @@ class DefaultsConfig(BaseModel):
         description="Maximum number of failed batches before stopping table archival",
         ge=1,
     )
+    verify_count_timeout_seconds: int = Field(
+        default=300,
+        description="Timeout in seconds for the verify COUNT query (WHERE id = ANY(...)). "
+        "Increase for large tables; pool default is 60s and can cause timeouts.",
+        ge=60,
+        le=3600,
+    )
     query_plan_analysis: bool = Field(
         default=True,
         description="Enable query plan analysis for performance monitoring",
@@ -571,6 +607,50 @@ class DefaultsConfig(BaseModel):
         description="Maximum concurrent uploads when async pipeline is enabled",
         ge=1,
         le=5,
+    )
+    # Read replica load balancing configuration
+    read_replica_enabled: bool = Field(
+        default=True,
+        description="Enable read replica load balancing for SELECT queries",
+    )
+    read_replica_selection_strategy: str = Field(
+        default="round_robin",
+        description="Replica selection strategy: round_robin, least_connections, lag_aware",
+    )
+
+    @field_validator("read_replica_selection_strategy")
+    @classmethod
+    def validate_selection_strategy(cls, v: str) -> str:
+        """Validate replica selection strategy."""
+        valid_strategies = ["round_robin", "least_connections", "lag_aware"]
+        if v.lower() not in valid_strategies:
+            raise ValueError(
+                f"read_replica_selection_strategy must be one of {valid_strategies}, got '{v}'"
+            )
+        return v.lower()
+    read_replica_max_lag_seconds: float = Field(
+        default=10.0,
+        description="Maximum acceptable replication lag in seconds",
+        ge=0,
+    )
+    read_replica_health_check_interval: int = Field(
+        default=30,
+        description="Health check interval in seconds",
+        ge=5,
+    )
+    read_replica_circuit_breaker_failure_threshold: int = Field(
+        default=5,
+        description="Number of failures before excluding replica from selection",
+        ge=1,
+    )
+    read_replica_circuit_breaker_recovery_timeout: int = Field(
+        default=60,
+        description="Seconds to wait before retrying excluded replica",
+        ge=10,
+    )
+    read_replica_fallback_to_primary: bool = Field(
+        default=True,
+        description="Fall back to primary if all replicas are unavailable",
     )
 
 

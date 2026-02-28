@@ -30,8 +30,6 @@ defaults:
 
 # Databases to connect for archiving
 
-
-
 databases:
   - name: production_db              # Name for this database connection group
     host: localhost                  # Hostname or IP of Postgres server

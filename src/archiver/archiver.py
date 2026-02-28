@@ -355,7 +355,32 @@ class Archiver:
         # Get connection pool size (database-specific or global default)
         pool_size = db_config.connection_pool_size or self.config.defaults.connection_pool_size
 
-        db_manager = DatabaseManager(db_config, pool_size=pool_size, logger=self.logger)
+        # Get read replica configuration from defaults
+        defaults = self.config.defaults
+        db_manager = DatabaseManager(
+            db_config,
+            pool_size=pool_size,
+            logger=self.logger,
+            read_replica_enabled=getattr(defaults, "read_replica_enabled", True),
+            read_replica_selection_strategy=getattr(
+                defaults, "read_replica_selection_strategy", "round_robin"
+            ),
+            read_replica_max_lag_seconds=getattr(
+                defaults, "read_replica_max_lag_seconds", 10.0
+            ),
+            read_replica_health_check_interval=getattr(
+                defaults, "read_replica_health_check_interval", 30
+            ),
+            read_replica_circuit_breaker_failure_threshold=getattr(
+                defaults, "read_replica_circuit_breaker_failure_threshold", 5
+            ),
+            read_replica_circuit_breaker_recovery_timeout=getattr(
+                defaults, "read_replica_circuit_breaker_recovery_timeout", 60
+            ),
+            read_replica_fallback_to_primary=getattr(
+                defaults, "read_replica_fallback_to_primary", True
+            ),
+        )
         s3_client = S3Client(self.config.s3, logger=self.logger)
 
         # Acquire database-level lock to prevent concurrent runs
@@ -1428,13 +1453,21 @@ class Archiver:
         schema = safe_identifier(table_config.schema_name)
         table = safe_identifier(table_config.name)
 
-        # Count records with these primary keys (for verification)
+        # Count records with these primary keys (for verification).
+        # Use a dedicated connection with longer timeout: WHERE id = ANY(...) on large
+        # tables can exceed the pool's 60s command_timeout. idx_(created_at, id) does
+        # not help this query (needs index on id / PK).
         count_query = f"""
             SELECT COUNT(*)
             FROM {schema}.{table}
             WHERE {pk_col} = ANY($1)
         """
-        db_count = await db_manager.fetchval(count_query, primary_keys)
+        verify_timeout = getattr(
+            self.config.defaults, "verify_count_timeout_seconds", 300
+        )
+        db_count = await db_manager.fetchval_with_timeout(
+            count_query, verify_timeout, primary_keys
+        )
 
         # Serialize to JSONL
         archived_at = datetime.now(timezone.utc)

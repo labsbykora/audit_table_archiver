@@ -10,6 +10,8 @@ from structlog import BoundLogger
 
 from archiver.config import DatabaseConfig
 from archiver.exceptions import DatabaseError
+from archiver.replica_pool import ReplicaConfig, ReplicaPool
+from archiver.replica_selector import ReplicaSelector, create_selector
 from utils.logging import get_logger
 from utils.retry import RetryConfig, retry_async
 
@@ -23,6 +25,13 @@ class DatabaseManager:
         pool_size: int = 5,
         logger: Optional[BoundLogger] = None,
         max_reconnect_attempts: int = 3,
+        read_replica_enabled: bool = True,
+        read_replica_selection_strategy: str = "round_robin",
+        read_replica_max_lag_seconds: float = 10.0,
+        read_replica_health_check_interval: int = 30,
+        read_replica_circuit_breaker_failure_threshold: int = 5,
+        read_replica_circuit_breaker_recovery_timeout: int = 60,
+        read_replica_fallback_to_primary: bool = True,
     ) -> None:
         """Initialize database manager.
 
@@ -31,11 +40,18 @@ class DatabaseManager:
             pool_size: Connection pool size
             logger: Optional logger instance
             max_reconnect_attempts: Maximum reconnection attempts (default: 3)
+            read_replica_enabled: Enable read replica load balancing
+            read_replica_selection_strategy: Replica selection strategy
+            read_replica_max_lag_seconds: Maximum acceptable replication lag
+            read_replica_health_check_interval: Health check interval in seconds
+            read_replica_circuit_breaker_failure_threshold: Failures before excluding replica
+            read_replica_circuit_breaker_recovery_timeout: Seconds before retrying excluded replica
+            read_replica_fallback_to_primary: Fall back to primary if replicas unavailable
         """
         self.config = config
         self.pool_size = pool_size
         self.logger = logger or get_logger("database")
-        self.pool: Optional[asyncpg.Pool] = None
+        self.pool: Optional[asyncpg.Pool] = None  # Primary pool
         self._dsn: Optional[str] = None
         self.max_reconnect_attempts = max_reconnect_attempts
         self._reconnect_config = RetryConfig(
@@ -50,6 +66,24 @@ class DatabaseManager:
                 ConnectionError,
             ),
         )
+
+        # Read replica configuration
+        self.read_replica_enabled = read_replica_enabled
+        self.read_replica_selection_strategy = read_replica_selection_strategy
+        self.read_replica_max_lag_seconds = read_replica_max_lag_seconds
+        self.read_replica_health_check_interval = read_replica_health_check_interval
+        self.read_replica_circuit_breaker_failure_threshold = (
+            read_replica_circuit_breaker_failure_threshold
+        )
+        self.read_replica_circuit_breaker_recovery_timeout = (
+            read_replica_circuit_breaker_recovery_timeout
+        )
+        self.read_replica_fallback_to_primary = read_replica_fallback_to_primary
+
+        # Replica pools and selector
+        self.replica_pools: list[ReplicaPool] = []
+        self.replica_selector: Optional[ReplicaSelector] = None
+        self._health_check_task: Optional[asyncio.Task[None]] = None
 
     @property
     def dsn(self) -> str:
@@ -123,12 +157,204 @@ class DatabaseManager:
                 },
             ) from e
 
+        # Initialize read replicas if enabled
+        if self.read_replica_enabled:
+            await self._initialize_replicas()
+            if self.replica_pools:
+                self._start_health_check_task()
+
     async def disconnect(self) -> None:
         """Close connection pool."""
+        # Stop health check task
+        if self._health_check_task:
+            self._health_check_task.cancel()
+            try:
+                await self._health_check_task
+            except asyncio.CancelledError:
+                pass
+            self._health_check_task = None
+
+        # Close replica pools
+        for replica_pool in self.replica_pools:
+            await replica_pool.disconnect()
+        self.replica_pools.clear()
+
+        # Close primary pool
         if self.pool:
             self.logger.debug("Closing connection pool", database=self.config.name)
             await self.pool.close()
             self.pool = None
+
+    async def _initialize_replicas(self) -> None:
+        """Initialize read replica pools."""
+        if not self.config.read_replicas:
+            return
+
+        try:
+            password = self.config.get_password()
+        except ValueError as e:
+            self.logger.warning(
+                "Cannot initialize replicas: password not available",
+                error=str(e),
+            )
+            return
+
+        self.logger.info(
+            "Initializing read replicas",
+            database=self.config.name,
+            replica_count=len(self.config.read_replicas),
+        )
+
+        for replica_config_dict in self.config.read_replicas:
+            try:
+                replica_config = ReplicaConfig(
+                    host=replica_config_dict["host"],
+                    port=replica_config_dict.get("port", self.config.port),
+                    weight=replica_config_dict.get("weight", 1.0),
+                    name=replica_config_dict.get("name"),
+                )
+
+                replica_pool = ReplicaPool(
+                    config=replica_config,
+                    database_name=self.config.name,
+                    user=self.config.user,
+                    password=password,
+                    pool_size=self.pool_size,
+                    logger=self.logger,
+                )
+
+                try:
+                    await replica_pool.connect()
+                    self.replica_pools.append(replica_pool)
+                    self.logger.info(
+                        "Replica pool initialized",
+                        replica=replica_pool.identifier,
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        "Failed to initialize replica pool",
+                        replica=replica_pool.identifier,
+                        error=str(e),
+                    )
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to create replica config",
+                    error=str(e),
+                )
+
+        if self.replica_pools:
+            self.replica_selector = create_selector(self.read_replica_selection_strategy)
+            self.logger.info(
+                "Read replica load balancing enabled",
+                database=self.config.name,
+                replica_count=len(self.replica_pools),
+                strategy=self.read_replica_selection_strategy,
+            )
+        else:
+            self.logger.warning(
+                "No healthy replicas available, using primary only",
+                database=self.config.name,
+            )
+
+    def _start_health_check_task(self) -> None:
+        """Start background health check task for replicas."""
+        if self._health_check_task:
+            return
+
+        async def _health_check_loop() -> None:
+            """Background health check loop."""
+            while True:
+                try:
+                    await asyncio.sleep(self.read_replica_health_check_interval)
+                    for replica_pool in self.replica_pools:
+                        await replica_pool.health_check()
+                        if self.read_replica_selection_strategy == "lag_aware":
+                            await replica_pool.check_replication_lag()
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    self.logger.warning(
+                        "Health check loop error",
+                        error=str(e),
+                    )
+
+        self._health_check_task = asyncio.create_task(_health_check_loop())
+
+    def _is_read_query(self, query: str) -> bool:
+        """Check if query is read-only (SELECT).
+
+        Args:
+            query: SQL query string
+
+        Returns:
+            True if query is read-only, False otherwise
+        """
+        query_upper = query.strip().upper()
+        # Check for SELECT, EXPLAIN, or SHOW statements
+        return (
+            query_upper.startswith("SELECT")
+            or query_upper.startswith("EXPLAIN")
+            or query_upper.startswith("SHOW")
+            or query_upper.startswith("WITH")  # CTEs are typically read-only
+        )
+
+    @asynccontextmanager
+    async def _get_connection_for_query(
+        self, query: str, use_replica: bool = True
+    ) -> AsyncGenerator[asyncpg.Connection, None]:
+        """Get appropriate connection (replica or primary) for query.
+
+        Args:
+            query: SQL query string
+            use_replica: Whether to prefer replica for read queries
+
+        Yields:
+            Database connection
+        """
+        # Always use primary for write operations
+        if not self._is_read_query(query):
+            async with self.acquire_connection() as conn:
+                yield conn
+            return
+
+        # Use replica for read operations if available
+        if (
+            use_replica
+            and self.read_replica_enabled
+            and self.replica_selector
+            and self.replica_pools
+        ):
+            replica = self.replica_selector.select_replica(
+                self.replica_pools, self.read_replica_fallback_to_primary
+            )
+
+            if replica:
+                # Check lag threshold
+                if replica.health.lag_seconds > self.read_replica_max_lag_seconds:
+                    self.logger.debug(
+                        "Replica lag exceeds threshold, using primary",
+                        replica=replica.identifier,
+                        lag_seconds=replica.health.lag_seconds,
+                        threshold=self.read_replica_max_lag_seconds,
+                    )
+                else:
+                    try:
+                        conn = await replica.acquire_connection()
+                        try:
+                            yield conn
+                        finally:
+                            replica.release_connection(conn)
+                        return
+                    except Exception as e:
+                        self.logger.debug(
+                            "Failed to acquire replica connection, falling back to primary",
+                            replica=replica.identifier,
+                            error=str(e),
+                        )
+
+        # Fall back to primary
+        async with self.acquire_connection() as conn:
+            yield conn
 
     async def health_check(self) -> bool:
         """Check database connection health.
@@ -263,7 +489,7 @@ class DatabaseManager:
             DatabaseError: If execution fails after retries
         """
         async def _fetch_internal() -> list[asyncpg.Record]:
-            async with self.acquire_connection() as conn:
+            async with self._get_connection_for_query(query) as conn:
                 return await conn.fetch(query, *args)
 
         try:
@@ -296,7 +522,7 @@ class DatabaseManager:
             DatabaseError: If execution fails after retries
         """
         async def _fetchrow_internal() -> Optional[asyncpg.Record]:
-            async with self.acquire_connection() as conn:
+            async with self._get_connection_for_query(query) as conn:
                 return await conn.fetchrow(query, *args)
 
         try:
@@ -329,7 +555,7 @@ class DatabaseManager:
             DatabaseError: If execution fails after retries
         """
         async def _fetchone_internal() -> Optional[dict[str, Any]]:
-            async with self.acquire_connection() as conn:
+            async with self._get_connection_for_query(query) as conn:
                 row = await conn.fetchrow(query, *args)
                 return dict(row) if row else None
 
@@ -363,7 +589,7 @@ class DatabaseManager:
             DatabaseError: If execution fails after retries
         """
         async def _fetchval_internal() -> Any:
-            async with self.acquire_connection() as conn:
+            async with self._get_connection_for_query(query) as conn:
                 return await conn.fetchval(query, *args)
 
         try:
@@ -381,6 +607,36 @@ class DatabaseManager:
                     "attempts": self.max_reconnect_attempts,
                 },
             ) from e
+
+    async def fetchval_with_timeout(
+        self, query: str, timeout_seconds: int, *args: Any
+    ) -> Any:
+        """Execute a query and return a single value with a dedicated connection and timeout.
+
+        Use for long-running queries (e.g. verify COUNT on large tables) that would
+        exceed the pool's command_timeout. Uses primary DSN only (no replica).
+
+        Args:
+            query: SQL query
+            timeout_seconds: Command timeout in seconds for this query only
+            *args: Query parameters
+
+        Returns:
+            Single value or None
+
+        Raises:
+            DatabaseError: If execution fails
+        """
+        conn = None
+        try:
+            conn = await asyncpg.connect(
+                self.dsn,
+                command_timeout=timeout_seconds,
+            )
+            return await conn.fetchval(query, *args)
+        finally:
+            if conn:
+                await conn.close()
 
     async def get_postgres_version(self) -> str:
         """Get PostgreSQL version.
