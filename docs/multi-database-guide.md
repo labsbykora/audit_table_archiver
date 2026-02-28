@@ -297,6 +297,22 @@ databases:
     connection_pool_size: 5
 ```
 
+## Verify count timeout on large tables
+
+If you see retries and "Query execution failed" during archival with a table that has an index like `idx_deal_audit_log_created_at_id` (on `(created_at, id)`):
+
+1. **That index is for batch selection** (ORDER BY created_at, id), not for the verify step. The verify step runs `SELECT COUNT(*) FROM ... WHERE id = ANY($1)`. For that query the planner needs an index on `id` (the primary key already provides this). The composite index `(created_at, id)` is not used for `WHERE id = ANY(...)` because the leading column is `created_at`.
+
+2. **The failure is usually the pool's 60s command timeout.** The verify COUNT can take longer on very large tables (tens of millions of rows) or under load. The archiver now runs this query with a dedicated connection and a longer timeout.
+
+3. **Config:** In `defaults`, set `verify_count_timeout_seconds` (default 300). Increase it if the verify step still times out:
+   ```yaml
+   defaults:
+     verify_count_timeout_seconds: 600  # 10 minutes for very large tables
+   ```
+
+4. **Ensure the table has a primary key on `id`** so the COUNT uses an index scan rather than a sequential scan. Run `ANALYZE "public"."deal_audit_log";` if stats are stale.
+
 ## See Also
 
 - [Quick Start Guide](quick-start.md)
