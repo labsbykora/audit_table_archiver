@@ -267,10 +267,6 @@ class DatabaseConfig(BaseModel):
                 stacklevel=2,
             )
         return self
-                "Cannot specify both 'password_env' and 'password'. "
-                "Use 'password_env' for production (recommended) or 'password' for development only."
-            )
-        return self
 
     def get_password(self) -> str:
         """Get password from environment variable or config file.
