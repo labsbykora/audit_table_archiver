@@ -387,12 +387,14 @@ class S3ArchiveReader:
 
         if database_name and table_name:
             # Try without schema first (actual archiver format)
+            # Trailing slash ensures we match only this table (e.g. auditlog_log/)
+            # and not tables with similar prefixes (e.g. auditlog_log_line)
             prefix_parts = []
             if base_prefix:
                 prefix_parts.append(base_prefix)
             prefix_parts.append(database_name)
             prefix_parts.append(table_name)
-            prefixes_to_try.append("/".join(prefix_parts))
+            prefixes_to_try.append("/".join(prefix_parts) + "/")
 
             # Also try with schema (for future compatibility or different archiver versions)
             prefix_parts_with_schema = []
@@ -401,7 +403,7 @@ class S3ArchiveReader:
             prefix_parts_with_schema.append(database_name)
             prefix_parts_with_schema.append("public")  # Default schema
             prefix_parts_with_schema.append(table_name)
-            prefixes_to_try.append("/".join(prefix_parts_with_schema))
+            prefixes_to_try.append("/".join(prefix_parts_with_schema) + "/")
         elif database_name:
             # Only database specified
             prefix_parts = []
@@ -416,6 +418,38 @@ class S3ArchiveReader:
 
         # Use the first prefix (without schema) as primary
         prefix = prefixes_to_try[0] if prefixes_to_try else ""
+
+        debug_run_id = "restore-list-archives"
+        mismatch_count = 0
+        mismatch_examples: list[str] = []
+        expected_table_segment = table_name or ""
+
+        # region agent log
+        try:
+            with open("debug-785179.log", "a", encoding="utf-8") as debug_file:
+                debug_file.write(
+                    json.dumps(
+                        {
+                            "sessionId": "785179",
+                            "runId": debug_run_id,
+                            "hypothesisId": "H1",
+                            "location": "src/restore/s3_reader.py:list_archives",
+                            "message": "list_archives_input",
+                            "data": {
+                                "database_name": database_name,
+                                "table_name": table_name,
+                                "base_prefix": base_prefix,
+                                "prefixes_to_try": prefixes_to_try,
+                            },
+                            "timestamp": int(datetime.now(tz=timezone.utc).timestamp() * 1000),
+                        },
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # endregion
 
         self.logger.debug(
             "Listing archives",
@@ -442,6 +476,61 @@ class S3ArchiveReader:
 
                             # Only include .jsonl.gz files (exclude metadata files)
                             if key.endswith(".jsonl.gz"):
+                                if database_name and expected_table_segment:
+                                    key_parts = key.split("/")
+                                    inferred_table_segment = None
+                                    if base_prefix:
+                                        base_parts = base_prefix.split("/")
+                                        if (
+                                            len(key_parts) > len(base_parts) + 1
+                                            and key_parts[: len(base_parts)] == base_parts
+                                            and key_parts[len(base_parts)] == database_name
+                                        ):
+                                            inferred_table_segment = key_parts[len(base_parts) + 1]
+                                    elif len(key_parts) > 1 and key_parts[0] == database_name:
+                                        inferred_table_segment = key_parts[1]
+
+                                    if (
+                                        inferred_table_segment
+                                        and inferred_table_segment != expected_table_segment
+                                    ):
+                                        mismatch_count += 1
+                                        if len(mismatch_examples) < 3:
+                                            mismatch_examples.append(key)
+                                            # region agent log
+                                            try:
+                                                with open(
+                                                    "debug-785179.log", "a", encoding="utf-8"
+                                                ) as debug_file:
+                                                    debug_file.write(
+                                                        json.dumps(
+                                                            {
+                                                                "sessionId": "785179",
+                                                                "runId": debug_run_id,
+                                                                "hypothesisId": "H2",
+                                                                "location": "src/restore/s3_reader.py:list_archives",
+                                                                "message": "table_prefix_mismatch_candidate",
+                                                                "data": {
+                                                                    "search_prefix": search_prefix,
+                                                                    "expected_table_segment": expected_table_segment,
+                                                                    "inferred_table_segment": inferred_table_segment,
+                                                                    "s3_key": key,
+                                                                },
+                                                                "timestamp": int(
+                                                                    datetime.now(
+                                                                        tz=timezone.utc
+                                                                    ).timestamp()
+                                                                    * 1000
+                                                                ),
+                                                            },
+                                                            separators=(",", ":"),
+                                                        )
+                                                        + "\n"
+                                                    )
+                                            except Exception:
+                                                pass
+                                            # endregion
+
                                 # Filter by date if specified
                                 if start_date or end_date:
                                     # Extract date from key: year=YYYY/month=MM/day=DD
@@ -492,6 +581,33 @@ class S3ArchiveReader:
                                             s3_keys.append(key)
                                 else:
                                     s3_keys.append(key)
+
+            # region agent log
+            try:
+                with open("debug-785179.log", "a", encoding="utf-8") as debug_file:
+                    debug_file.write(
+                        json.dumps(
+                            {
+                                "sessionId": "785179",
+                                "runId": debug_run_id,
+                                "hypothesisId": "H3",
+                                "location": "src/restore/s3_reader.py:list_archives",
+                                "message": "list_archives_result",
+                                "data": {
+                                    "prefix": prefix,
+                                    "returned_count": len(s3_keys),
+                                    "mismatch_count": mismatch_count,
+                                    "mismatch_examples": mismatch_examples,
+                                },
+                                "timestamp": int(datetime.now(tz=timezone.utc).timestamp() * 1000),
+                            },
+                            separators=(",", ":"),
+                        )
+                        + "\n"
+                    )
+            except Exception:
+                pass
+            # endregion
 
             self.logger.debug("Found archives", count=len(s3_keys), prefix=prefix)
             return sorted(s3_keys)

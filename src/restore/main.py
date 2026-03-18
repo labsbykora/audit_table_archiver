@@ -1,6 +1,7 @@
 """CLI entry point for restore utility."""
 
 import asyncio
+import json
 import re
 import sys
 from collections import defaultdict
@@ -588,6 +589,35 @@ async def _restore_all(
     # Initialize S3 reader and client
     s3_reader = S3ArchiveReader(archiver_config.s3, logger=logger)
     s3_client = S3Client(archiver_config.s3, logger=logger)
+    debug_run_id = "restore-main-restore-all"
+    logged_key_table_mismatch = False
+
+    # region agent log
+    try:
+        with open("debug-785179.log", "a", encoding="utf-8") as debug_file:
+            debug_file.write(
+                json.dumps(
+                    {
+                        "sessionId": "785179",
+                        "runId": debug_run_id,
+                        "hypothesisId": "H4",
+                        "location": "src/restore/main.py:_restore_all",
+                        "message": "restore_all_input",
+                        "data": {
+                            "database_name": database_name,
+                            "table_name": table_name,
+                            "schema_name": schema_name,
+                            "s3_prefix": archiver_config.s3.prefix,
+                        },
+                        "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+    # endregion
 
     # Initialize restore watermark manager if enabled
     # Note: We initialize it even when ignoring watermark, so we can still update it at the end
@@ -777,6 +807,52 @@ async def _restore_all(
 
         for idx, archive_key in enumerate(sorted(archive_keys), 1):
             try:
+                if not logged_key_table_mismatch:
+                    key_parts = archive_key.split("/")
+                    expected_table_segment = table_name
+                    inferred_table_segment = None
+                    if archiver_config.s3.prefix:
+                        prefix_parts = archiver_config.s3.prefix.rstrip("/").split("/")
+                        if (
+                            len(key_parts) > len(prefix_parts) + 1
+                            and key_parts[: len(prefix_parts)] == prefix_parts
+                            and key_parts[len(prefix_parts)] == database_name
+                        ):
+                            inferred_table_segment = key_parts[len(prefix_parts) + 1]
+                    elif len(key_parts) > 1 and key_parts[0] == database_name:
+                        inferred_table_segment = key_parts[1]
+
+                    if inferred_table_segment and inferred_table_segment != expected_table_segment:
+                        logged_key_table_mismatch = True
+                        # region agent log
+                        try:
+                            with open("debug-785179.log", "a", encoding="utf-8") as debug_file:
+                                debug_file.write(
+                                    json.dumps(
+                                        {
+                                            "sessionId": "785179",
+                                            "runId": debug_run_id,
+                                            "hypothesisId": "H4",
+                                            "location": "src/restore/main.py:_restore_all",
+                                            "message": "restore_loop_key_table_mismatch",
+                                            "data": {
+                                                "file_number": idx,
+                                                "expected_table_segment": expected_table_segment,
+                                                "inferred_table_segment": inferred_table_segment,
+                                                "s3_key": archive_key,
+                                            },
+                                            "timestamp": int(
+                                                datetime.utcnow().timestamp() * 1000
+                                            ),
+                                        },
+                                        separators=(",", ":"),
+                                    )
+                                    + "\n"
+                                )
+                        except Exception:
+                            pass
+                        # endregion
+
                 logger.debug(
                     "Restoring archive",
                     file_number=idx,
